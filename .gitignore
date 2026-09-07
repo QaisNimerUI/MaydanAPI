@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Rider / VS
+.vs/
+.idea/
+
+## Test / build output
+[Dd]ebug/
+[Rr]elease/
+TestResults/
+
+## User secrets are stored outside the repo (%APPDATA%\Microsoft\UserSecrets) — never commit them.
+secrets.json
