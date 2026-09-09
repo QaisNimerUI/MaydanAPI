@@ -11,6 +11,7 @@ public class UnitOfWork : IUnitOfWork
     private IRoleRepository? _roles;
     private IPermissionRepository? _permissions;
     private IGroupRepository? _groups;
+    private IProjectTypeRepository? _projectTypes;
     private ICountryRepository? _countries;
     private ICityRepository? _cities;
     private IAssociationRepository? _associations;
@@ -33,7 +34,8 @@ public class UnitOfWork : IUnitOfWork
     public IProductionCompanyRepository ProductionCompanies => _productionCompanies ??= new ProductionCompanyRepository(_context);
     public IProjectRepository Projects => _projects ??= new ProjectRepository(_context);
     public IWorkerRepository Workers => _workers ??= new WorkerRepository(_context);
-
+    public IProjectTypeRepository ProjectTypes =>
+    _projectTypes ??= new ProjectTypeRepository(_context);
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _context.SaveChangesAsync(cancellationToken);
 }

@@ -1,8 +1,11 @@
-using System.Linq.Expressions;
-using System.Reflection;
+
 using Maydan.Domain.Common;
 using Maydan.Domain.Entities;
+using Maydan.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+
+using System.Reflection;
 
 namespace Maydan.Infrastructure.Persistence;
 
@@ -23,6 +26,7 @@ public class MaydanDbContext : DbContext
 
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<City> Cities => Set<City>();
+    public DbSet<ProjectType> ProjectTypes { get; set; }
     public DbSet<Association> Associations => Set<Association>();
     public DbSet<ProductionCompany> ProductionCompanies => Set<ProductionCompany>();
     public DbSet<Project> Projects => Set<Project>();
@@ -31,6 +35,8 @@ public class MaydanDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MaydanDbContext).Assembly);
+
+        ProjectTypeSeed.Seed(modelBuilder);
 
         // Global soft-delete filter for every SharedEntities (IsDeleted set by SaveChangesAsync below).
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

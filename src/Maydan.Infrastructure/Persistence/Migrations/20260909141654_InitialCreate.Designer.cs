@@ -4,6 +4,7 @@ using Maydan.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Maydan.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MaydanDbContext))]
-    partial class MaydanDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909141654_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -373,7 +376,11 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("EndDate")
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("EndDate")
                         .HasColumnType("datetime2");
 
                     b.Property<bool>("IsActive")
@@ -382,26 +389,12 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<int>("LocationManagerUserId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProducerUserId")
-                        .HasColumnType("int");
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("ProductionCompanyId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ProjectNameAr")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("ProjectNameEn")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("ProjectTypeId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("StartDate")
@@ -410,196 +403,11 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("WorkPermitImagePath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("LocationManagerUserId");
-
-                    b.HasIndex("ProducerUserId");
 
                     b.HasIndex("ProductionCompanyId");
 
-                    b.HasIndex("ProjectTypeId");
-
-                    b.ToTable("Projects", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Projects_EndDate_After_StartDate", "[EndDate] > [StartDate]");
-
-                            t.HasCheckConstraint("CK_Projects_Producer_LocationManager", "[ProducerUserId] <> [LocationManagerUserId]");
-                        });
-                });
-
-            modelBuilder.Entity("Maydan.Domain.Entities.ProjectType", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("NameAr")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("NameEn")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NameAr")
-                        .IsUnique();
-
-                    b.HasIndex("NameEn")
-                        .IsUnique();
-
-                    b.ToTable("ProjectTypes", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "عرض واقعي",
-                            NameEn = "Reality Show"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "فيديو موسيقي",
-                            NameEn = "Music Video"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "إعلانات متلفزة",
-                            NameEn = "Commercials"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "فيلم قصير",
-                            NameEn = "Short Film"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "فيلم طويل",
-                            NameEn = "Feature Film"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "صور متحركة",
-                            NameEn = "Animation"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "تصوير فوتوغرافي",
-                            NameEn = "Photography"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "برامج",
-                            NameEn = "TV Program"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "مسلسل",
-                            NameEn = "Series"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "ألعاب تفاعلية",
-                            NameEn = "Interactive/Game"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "وثائقي طويل",
-                            NameEn = "Feature Documentary"
-                        },
-                        new
-                        {
-                            Id = 12,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "وثائقي قصير",
-                            NameEn = "Short Documentary"
-                        },
-                        new
-                        {
-                            Id = 13,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "مسلسل وثائقي",
-                            NameEn = "Documentary Series"
-                        },
-                        new
-                        {
-                            Id = 14,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "وثائقي صناعي/شركات",
-                            NameEn = "Corporate/Industrial Documentary"
-                        },
-                        new
-                        {
-                            Id = 15,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "إنتاج طلابي",
-                            NameEn = "Student Film"
-                        });
+                    b.ToTable("Projects", (string)null);
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Role", b =>
@@ -1002,37 +810,13 @@ namespace Maydan.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Maydan.Domain.Entities.Project", b =>
                 {
-                    b.HasOne("Maydan.Domain.Entities.User", "LocationManager")
-                        .WithMany()
-                        .HasForeignKey("LocationManagerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Maydan.Domain.Entities.User", "Producer")
-                        .WithMany()
-                        .HasForeignKey("ProducerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("Maydan.Domain.Entities.ProductionCompany", "ProductionCompany")
                         .WithMany("Projects")
                         .HasForeignKey("ProductionCompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Maydan.Domain.Entities.ProjectType", "ProjectType")
-                        .WithMany("Projects")
-                        .HasForeignKey("ProjectTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("LocationManager");
-
-                    b.Navigation("Producer");
-
                     b.Navigation("ProductionCompany");
-
-                    b.Navigation("ProjectType");
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.RolePermission", b =>
@@ -1146,11 +930,6 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.ProductionCompany", b =>
-                {
-                    b.Navigation("Projects");
-                });
-
-            modelBuilder.Entity("Maydan.Domain.Entities.ProjectType", b =>
                 {
                     b.Navigation("Projects");
                 });

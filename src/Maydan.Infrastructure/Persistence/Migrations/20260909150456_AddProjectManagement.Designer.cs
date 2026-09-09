@@ -4,6 +4,7 @@ using Maydan.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Maydan.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MaydanDbContext))]
-    partial class MaydanDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909150456_AddProjectManagement")]
+    partial class AddProjectManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -478,128 +481,6 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("ProjectTypes", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "عرض واقعي",
-                            NameEn = "Reality Show"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "فيديو موسيقي",
-                            NameEn = "Music Video"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "إعلانات متلفزة",
-                            NameEn = "Commercials"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "فيلم قصير",
-                            NameEn = "Short Film"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "فيلم طويل",
-                            NameEn = "Feature Film"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "صور متحركة",
-                            NameEn = "Animation"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "تصوير فوتوغرافي",
-                            NameEn = "Photography"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "برامج",
-                            NameEn = "TV Program"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "مسلسل",
-                            NameEn = "Series"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "ألعاب تفاعلية",
-                            NameEn = "Interactive/Game"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "وثائقي طويل",
-                            NameEn = "Feature Documentary"
-                        },
-                        new
-                        {
-                            Id = 12,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "وثائقي قصير",
-                            NameEn = "Short Documentary"
-                        },
-                        new
-                        {
-                            Id = 13,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "مسلسل وثائقي",
-                            NameEn = "Documentary Series"
-                        },
-                        new
-                        {
-                            Id = 14,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "وثائقي صناعي/شركات",
-                            NameEn = "Corporate/Industrial Documentary"
-                        },
-                        new
-                        {
-                            Id = 15,
-                            IsActive = true,
-                            IsDeleted = false,
-                            NameAr = "إنتاج طلابي",
-                            NameEn = "Student Film"
-                        });
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Role", b =>

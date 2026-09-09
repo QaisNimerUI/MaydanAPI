@@ -6,7 +6,7 @@ public interface IUnitOfWork
     IRoleRepository Roles { get; }
     IPermissionRepository Permissions { get; }
     IGroupRepository Groups { get; }
-
+    IProjectTypeRepository ProjectTypes { get; }
     ICountryRepository Countries { get; }
     ICityRepository Cities { get; }
     IAssociationRepository Associations { get; }
