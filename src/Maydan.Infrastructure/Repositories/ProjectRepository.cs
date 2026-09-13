@@ -14,14 +14,43 @@ public class ProjectRepository : IProjectRepository
         _context = context;
     }
 
-    public Task<Project?> GetByIdAsync(int projectId, CancellationToken cancellationToken = default) =>
-        _context.Projects.FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+    public Task<Project?> GetByIdAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.Projects
+            .Include(x => x.ProjectType)
+            .Include(x => x.Producer)
+            .Include(x => x.LocationManager)
+            .Include(x => x.ProductionCompany)
+            .FirstOrDefaultAsync(
+                x => x.Id == projectId,
+                cancellationToken);
+    }
 
-    public Task<List<Project>> GetByProductionCompanyIdAsync(int productionCompanyId, CancellationToken cancellationToken = default) =>
-        _context.Projects.Where(p => p.ProductionCompanyId == productionCompanyId).ToListAsync(cancellationToken);
+    public Task<List<Project>> GetByProductionCompanyIdAsync(
+        int productionCompanyId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.Projects
+            .AsNoTracking()
+            .Include(x => x.ProjectType)
+            .Include(x => x.Producer)
+            .Include(x => x.LocationManager)
+            .Where(x => x.ProductionCompanyId == productionCompanyId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
 
-    public async Task AddAsync(Project project, CancellationToken cancellationToken = default) =>
+    public async Task AddAsync(
+        Project project,
+        CancellationToken cancellationToken = default)
+    {
         await _context.Projects.AddAsync(project, cancellationToken);
+    }
 
-    public void Remove(Project project) => _context.Projects.Remove(project);
+    public void Remove(Project project)
+    {
+        _context.Projects.Remove(project);
+    }
 }

@@ -4,14 +4,25 @@ namespace Maydan.Domain.Entities;
 
 public class Project : SharedEntities
 {
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
+    public string ProjectNameEn { get; set; } = string.Empty;
+    public string ProjectNameAr { get; set; } = string.Empty;
+
     public DateTime StartDate { get; set; }
-    public DateTime? EndDate { get; set; }
+    public DateTime EndDate { get; set; }
+
+    public int ProjectTypeId { get; set; }
+    public ProjectType ProjectType { get; set; } = null!;
+
+    public int ProducerUserId { get; set; }
+    public User Producer { get; set; } = null!;
+
+    public int LocationManagerUserId { get; set; }
+    public User LocationManager { get; set; } = null!;
+
+    public string WorkPermitImagePath { get; set; } = string.Empty;
 
     public int ProductionCompanyId { get; set; }
     public ProductionCompany ProductionCompany { get; set; } = null!;
 
-    // Deliberately excluded (section: "متعمّد الاستبعاد"): Association link, ProjectLocation,
-    // and any Status/Approval field — deferred with the Service Request system.
+    // Approval/status remains handled by the Service Request workflow.
 }
