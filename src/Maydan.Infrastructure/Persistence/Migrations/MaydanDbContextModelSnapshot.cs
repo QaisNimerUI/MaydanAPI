@@ -226,6 +226,9 @@ namespace Maydan.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EntityType", "EntityId");
 
+                    b.HasIndex("GroupNameEn")
+                        .IsUnique();
+
                     b.ToTable("Groups", (string)null);
                 });
 
@@ -648,6 +651,9 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.HasKey("RoleId");
 
                     b.HasIndex("RoleNameAr")
+                        .IsUnique();
+
+                    b.HasIndex("RoleNameEn")
                         .IsUnique();
 
                     b.HasIndex("RoleNameEn")
