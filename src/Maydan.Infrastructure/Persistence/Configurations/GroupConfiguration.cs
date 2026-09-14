@@ -20,7 +20,13 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
             .IsRequired()
             .HasMaxLength(100);
 
-        builder.HasIndex(g => g.GroupNameEn).IsUnique();
-        builder.HasIndex(g => g.GroupNameAr).IsUnique();
+        builder.Property(g => g.EntityType)
+        .IsRequired()
+        .HasConversion<string>()
+        .HasMaxLength(50);
+
+        builder.Property(g => g.EntityId).IsRequired();
+
+        builder.HasIndex(g => new { g.EntityType, g.EntityId });
     }
 }
