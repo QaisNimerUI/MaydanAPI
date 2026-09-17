@@ -4,7 +4,9 @@
 إدارة العمال المرتبطين بالجمعيات، وتوليد الـ QR code الخاص فيهم.
 
 ## الـ Entities المرتبطة
-- `Worker` (FirstName, MiddleName, LastName, CivilId, CivilIdHash, DateOfBirth, PhoneNumber, AssociationId, QrCode, IsActive)
+- `Worker` (FirstName, MiddleName, LastName, CivilId, CivilIdHash, DateOfBirth, PhoneNumber, AssociationId, QrCode)
+
+> `IsActive` comes from `SharedEntities`; it is not declared directly on `Worker`.
 
 ## الـ Endpoints
 | Method | Route | الوصف |

@@ -222,6 +222,8 @@ Configure:
 - Unique Email
 - Unique RolePermission
 - Unique UserPermission
+- Unique GroupNameEn per entity: `(EntityType, EntityId, GroupNameEn)`
+- Unique GroupNameAr per entity: `(EntityType, EntityId, GroupNameAr)`
 
 ---
 
@@ -262,15 +264,18 @@ Initial Bayt AlUrdon system user may receive all available permissions through U
 
 ## Phase 2.4 - First Migration
 
-Because the project is Code First and currently has no database:
+Status: Completed.
 
-Create the initial migration after the entities and configurations are finalized.
+The user-management database structure has been finalized for Part 1, migration `20260913135839_Initialize_DB` was created, and `Update-Database` was executed.
 
-Then create the database using:
+Follow-up group-scope migrations were added:
 
-Update-Database
+- `20260914090447_AddEntityScopeToGroups`
+- `20260914112533_AddScopedUniqueGroupNameIndexes`
 
-Do not create the migration before the User Management schema is reviewed and finalized.
+The solution builds successfully after the migration.
+
+Next database changes should be handled as follow-up migrations for later parts.
 
 ---
 
@@ -635,14 +640,15 @@ Test:
 
 # Recommended Implementation Order
 
-1. Domain Entities
-2. EF Core Configurations
-3. Seed Roles
+1. Domain Entities - completed
+2. EF Core Configurations - completed
+3. Seed Roles - started
 4. Seed Permissions
 5. Seed RolePermissions
-6. DbContext
-7. Initial Migration
-8. Create Database
+6. DbContext - completed
+7. Initial Migration - completed with `20260913135839_Initialize_DB`
+8. Create Database - completed with `Update-Database`
+8.1. Entity-scoped group-name indexes - completed with `20260914112533_AddScopedUniqueGroupNameIndexes`
 9. User Creation Use Case
 10. Entity Users APIs
 11. User Permission Management

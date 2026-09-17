@@ -72,6 +72,11 @@ public class MaydanDbContext : DbContext
                     entry.Entity.UpdatedAt = utcNow;
                     break;
                 case EntityState.Deleted:
+                    if (entry.Entity is UserGroup)
+                    {
+                        break;
+                    }
+
                     // Soft delete: never hard-delete an SharedEntities.
                     entry.State = EntityState.Modified;
                     entry.Entity.IsDeleted = true;

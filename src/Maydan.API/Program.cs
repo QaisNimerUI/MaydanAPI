@@ -1,6 +1,8 @@
 using System.Text;
 using FluentValidation;
+using Maydan.API.Security;
 using Maydan.Application.Interfaces;
+using Maydan.Application.Services;
 using Maydan.Infrastructure.Persistence;
 using Maydan.Infrastructure.Repositories;
 using Maydan.Infrastructure.Security;
@@ -38,6 +40,9 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<MaydanDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("MaydanDb")));
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
