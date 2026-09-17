@@ -27,6 +27,10 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
 
         builder.Property(g => g.EntityId).IsRequired();
 
-        builder.HasIndex(g => new { g.EntityType, g.EntityId });
+        builder.HasIndex(g => new { g.EntityType, g.EntityId, g.GroupNameEn })
+            .IsUnique();
+
+        builder.HasIndex(g => new { g.EntityType, g.EntityId, g.GroupNameAr })
+            .IsUnique();
     }
 }

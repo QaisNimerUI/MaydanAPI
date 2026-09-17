@@ -161,6 +161,8 @@ Fields:
 - GroupId
 - GroupNameEn
 - GroupNameAr
+- EntityType
+- EntityId
 
 Relationships:
 
@@ -168,6 +170,13 @@ Relationships:
 - Group can contain multiple Users through UserGroup.
 
 Groups allow predefined permission packages to be assigned to Users.
+
+Group names are unique inside the same entity only. The same group name can exist in different entities.
+
+Configured unique indexes:
+
+- `(EntityType, EntityId, GroupNameEn)`
+- `(EntityType, EntityId, GroupNameAr)`
 
 Example:
 
@@ -562,7 +571,12 @@ PermissionNameEn is unique.
 
 Group:
 
-Group names are configured according to the current naming requirements.
+Group names are unique per entity, not globally across the system:
+
+- `(EntityType, EntityId, GroupNameEn)` is unique.
+- `(EntityType, EntityId, GroupNameAr)` is unique.
+
+This allows different entities to reuse the same group names, such as `HR Standard`, while preventing duplicate group names inside one entity.
 
 Junction entities use Composite Primary Keys, preventing duplicate active database relationships with the same key combination:
 
@@ -687,6 +701,8 @@ Completed Password Hashing integration:
 Completed Database migration and database update:
 
 - Migration created: `20260913135839_Initialize_DB`.
+- Group entity scoping migration created: `20260914090447_AddEntityScopeToGroups`.
+- Scoped group-name uniqueness migration created: `20260914112533_AddScopedUniqueGroupNameIndexes`.
 - `MaydanDbContextModelSnapshot` was updated.
 - `Update-Database` was executed after the migration.
 - Solution build passes after the migration.

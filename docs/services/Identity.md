@@ -28,6 +28,10 @@
 - `User.PasswordHash` ينحفظ كـ hash فقط، وليس plain text. الآلية الحالية: `IPasswordHasher` + `PasswordHasher` باستخدام `PBKDF2-SHA256`.
 - Seed user الحالي يستخدم password أولي `Abc@123` محفوظ كـ generated hash داخل `UserSeedConfiguration`.
 - Schema/database status: migration `20260913135839_Initialize_DB` was created and `Update-Database` was executed for the current Part 1 structure.
+- `Group` مربوط بـ `EntityType` + `EntityId`. أسماء المجموعات unique داخل نفس الـ Entity فقط من خلال:
+  - `(EntityType, EntityId, GroupNameEn)`
+  - `(EntityType, EntityId, GroupNameAr)`
+- آخر migration للـ group scoped unique indexes: `20260914112533_AddScopedUniqueGroupNameIndexes`.
 
 ## الـ Dependencies
 لا شي — هاد أول Service بينبني، وكل الـ Services التانية (Associations, ProductionCompanies, Projects...) رح تعتمد عليه للـ Authorization.

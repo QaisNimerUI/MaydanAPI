@@ -23,8 +23,6 @@ public class Worker : SharedEntities
     public Association Association { get; set; } = null!;
 
     public string QrCode { get; set; } = string.Empty;
-    public bool IsActive { get; set; } = true;
-
     // Deliberately excluded: DailyWageAmount — belongs on the future ProjectWorker
     // assignment, not the worker themselves (deferred with the Service Request system).
 }

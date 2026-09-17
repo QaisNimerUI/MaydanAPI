@@ -222,6 +222,8 @@ Configure:
 - Unique Email
 - Unique RolePermission
 - Unique UserPermission
+- Unique GroupNameEn per entity: `(EntityType, EntityId, GroupNameEn)`
+- Unique GroupNameAr per entity: `(EntityType, EntityId, GroupNameAr)`
 
 ---
 
@@ -265,6 +267,11 @@ Initial Bayt AlUrdon system user may receive all available permissions through U
 Status: Completed.
 
 The user-management database structure has been finalized for Part 1, migration `20260913135839_Initialize_DB` was created, and `Update-Database` was executed.
+
+Follow-up group-scope migrations were added:
+
+- `20260914090447_AddEntityScopeToGroups`
+- `20260914112533_AddScopedUniqueGroupNameIndexes`
 
 The solution builds successfully after the migration.
 
@@ -641,6 +648,7 @@ Test:
 6. DbContext - completed
 7. Initial Migration - completed with `20260913135839_Initialize_DB`
 8. Create Database - completed with `Update-Database`
+8.1. Entity-scoped group-name indexes - completed with `20260914112533_AddScopedUniqueGroupNameIndexes`
 9. User Creation Use Case
 10. Entity Users APIs
 11. User Permission Management

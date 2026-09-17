@@ -18,7 +18,19 @@ public class PermissionRepository : IPermissionRepository
         _context.Permissions.FirstOrDefaultAsync(p => p.PermissionId == permissionId, cancellationToken);
 
     public Task<List<Permission>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        _context.Permissions.ToListAsync(cancellationToken);
+        _context.Permissions
+            .OrderBy(p => p.Module)
+            .ThenBy(p => p.PermissionNameEn)
+            .ToListAsync(cancellationToken);
+
+    public Task<List<Permission>> GetByIdsAsync(IEnumerable<int> permissionIds, CancellationToken cancellationToken = default)
+    {
+        var ids = permissionIds.Distinct().ToList();
+
+        return _context.Permissions
+            .Where(p => ids.Contains(p.PermissionId))
+            .ToListAsync(cancellationToken);
+    }
 
     public Task<List<Permission>> GetByModuleAsync(string module, CancellationToken cancellationToken = default) =>
         _context.Permissions.Where(p => p.Module == module).ToListAsync(cancellationToken);
