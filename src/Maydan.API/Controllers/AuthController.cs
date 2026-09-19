@@ -30,4 +30,21 @@ public class AuthController : ApiControllerBase
             return HandleException(exception);
         }
     }
+
+    [HttpPost("reset-password", Name = "Reset Password")]
+    public async Task<ActionResult<LoginResponseDto>> ResetPassword([FromBody] ResetPasswordDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _authService.ResetPasswordAsync(dto, cancellationToken));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(new { message = exception.Message });
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
 }

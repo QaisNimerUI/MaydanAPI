@@ -8,6 +8,8 @@ public class LoginRequestDto
     public string Password { get; set; } = string.Empty;
 }
 
+public record ResetPasswordDto(string Email, string CurrentPassword, string NewPassword);
+
 public record LoginResponseDto(
     bool IsAuthenticated,
     bool MustResetPassword,

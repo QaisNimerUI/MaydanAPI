@@ -59,6 +59,57 @@ public class AuthService : IAuthService
             "Login successful.");
     }
 
+    public async Task<LoginResponseDto> ResetPasswordAsync(ResetPasswordDto dto, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.CurrentPassword) || string.IsNullOrWhiteSpace(dto.NewPassword))
+        {
+            throw new InvalidOperationException("Email, current password, and new password are required.");
+        }
+
+        var email = dto.Email.Trim();
+        var user = await _unitOfWork.Users.GetByEmailWithAccessAsync(email, cancellationToken);
+
+        // Same identity check as LoginAsync, and deliberately the same failure shape/message: this
+        // endpoint is reached before any token exists (see AuthController), so knowledge of the
+        // current password is the only thing that can stand in for a Bearer token here.
+        if (user is null || !user.IsActive || !_passwordHasher.VerifyPassword(dto.CurrentPassword, user.PasswordHash))
+        {
+            throw new UnauthorizedAccessException("Invalid email or password.");
+        }
+
+        // Decision: reject rather than silently allow when MustResetPassword is already false. This
+        // endpoint exists specifically to satisfy the forced-reset flow; an account that isn't
+        // flagged for it has no business changing its password through an unauthenticated,
+        // current-password-only endpoint. A general "change my password" feature for already-fine
+        // accounts is a different, separate concern (see AuthService.ts's own `changePassword`,
+        // which targets a different, not-yet-implemented endpoint) and isn't what this ticket adds.
+        if (!user.MustResetPassword)
+        {
+            throw new InvalidOperationException("Password reset is not required for this account.");
+        }
+
+        // GetByEmailWithAccessAsync above is AsNoTracking (needed for the full Role/Permissions
+        // graph MapAuthUser reads), so it can't be mutated and saved directly. Re-fetch a tracked
+        // instance for the write; the no-tracking `user` from above remains valid for MapAuthUser.
+        var trackedUser = await _unitOfWork.Users.GetByIdAsync(user.UserId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Invalid email or password.");
+
+        trackedUser.PasswordHash = _passwordHasher.HashPassword(dto.NewPassword);
+        trackedUser.MustResetPassword = false;
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var authUser = MapAuthUser(user);
+        var token = _jwtTokenGenerator.GenerateAccessToken(authUser);
+
+        return new LoginResponseDto(
+            true,
+            false,
+            token.AccessToken,
+            token.ExpiresAtUtc,
+            authUser,
+            "Password reset successful.");
+    }
+
     private static AuthUserDto MapAuthUser(User user)
     {
         var permissions = user.Role.RolePermissions
