@@ -1,9 +1,16 @@
 using Maydan.Application.DTOs.Auth;
 using Maydan.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maydan.API.Controllers;
 
+// Deliberately public: login and reset-password both authenticate the caller via credentials
+// in the request body (email/password), not a Bearer token — there is no session yet at the
+// point these actions run. AllowAnonymous is explicit here so this reads as an intentional
+// choice, not an oversight, now that GroupsController/PermissionsController/UsersController
+// all carry [Authorize].
+[AllowAnonymous]
 [Route("api/auth")]
 public class AuthController : ApiControllerBase
 {

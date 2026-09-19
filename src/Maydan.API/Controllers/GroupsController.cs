@@ -1,9 +1,11 @@
 using Maydan.Application.DTOs.UserManagement;
 using Maydan.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maydan.API.Controllers;
 
+[Authorize]
 [Route("api/groups")]
 public class GroupsController : ApiControllerBase
 {
