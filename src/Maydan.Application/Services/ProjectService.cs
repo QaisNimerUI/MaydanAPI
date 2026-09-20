@@ -1,10 +1,22 @@
-﻿using Maydan.Application.DTOs.Projects;
+using Maydan.Application.DTOs.Projects;
 using Maydan.Application.Interfaces;
 using Maydan.Domain.Entities;
 using Maydan.Domain.Enums;
 
 namespace Maydan.Application.Services;
 
+// Projects audit follow-up: every validation failure in this class used to throw a bare
+// Exception, which ApiControllerBase.HandleException's switch has no case for — it always fell
+// through to the generic 500 branch regardless of whether the real problem was a 400 (bad
+// input/business rule) or a 404 (referenced entity not found). Every throw below now uses the
+// same exception-type convention UserManagementService already established:
+// InvalidOperationException for business-rule violations, KeyNotFoundException for "not found",
+// UnauthorizedAccessException for acting outside the caller's own entity boundary (mirrors
+// UserManagementService.GetScopedUserAsync()'s "Cannot manage users outside the current entity").
+//
+// NOTE (deliberately out of scope): linking a Project to Locations/Associations is blocked on the
+// GIS team providing real location data — no field, table, or DTO for that exists here, and none
+// should be added until that data is available.
 public class ProjectService : IProjectService
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -19,78 +31,28 @@ public class ProjectService : IProjectService
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var currentUser = await _unitOfWork.Users.GetByIdAsync(
-            currentUserId,
-            cancellationToken);
-
-        if (currentUser is null)
-            throw new Exception("Current user not found.");
+        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
 
         if (currentUser.EntityType != EntityType.ProductionCompany)
-            throw new Exception(
-                "Only Production Company users can create projects.");
-
-        if (string.IsNullOrWhiteSpace(request.ProjectNameEn))
-            throw new Exception(
-                "English project name is required.");
-
-        if (string.IsNullOrWhiteSpace(request.ProjectNameAr))
-            throw new Exception(
-                "Arabic project name is required.");
-
-        if (request.ProjectNameEn.Trim().Length > 200)
-            throw new Exception(
-                "English project name cannot exceed 200 characters.");
-
-        if (request.ProjectNameAr.Trim().Length > 200)
-            throw new Exception(
-                "Arabic project name cannot exceed 200 characters.");
-
-        if (request.EndDate <= request.StartDate)
-            throw new Exception(
-                "End date must be greater than start date.");
-
-        if (request.ProducerUserId == request.LocationManagerUserId)
-            throw new Exception(
-                "Producer and Location Manager must be different users.");
-
-        var projectTypeExists =
-            await _unitOfWork.ProjectTypes.ExistsAsync(
-                request.ProjectTypeId,
-                cancellationToken);
-
-        if (!projectTypeExists)
-            throw new Exception("Invalid Project Type.");
-
-        var producer =
-            await _unitOfWork.Users.GetByIdAsync(
-                request.ProducerUserId,
-                cancellationToken);
-
-        if (producer is null)
-            throw new Exception("Producer not found.");
-
-        var locationManager =
-            await _unitOfWork.Users.GetByIdAsync(
-                request.LocationManagerUserId,
-                cancellationToken);
-
-        if (locationManager is null)
-            throw new Exception("Location Manager not found.");
-
-        if (producer.EntityType != EntityType.ProductionCompany ||
-            producer.EntityId != currentUser.EntityId)
         {
-            throw new Exception(
-                "Producer must belong to the same Production Company.");
+            throw new InvalidOperationException("Only Production Company users can create projects.");
         }
 
-        if (locationManager.EntityType != EntityType.ProductionCompany ||
-            locationManager.EntityId != currentUser.EntityId)
+        ValidateProjectPayload(
+            request.ProjectNameEn,
+            request.ProjectNameAr,
+            request.StartDate,
+            request.EndDate,
+            request.ProducerUserId,
+            request.LocationManagerUserId);
+
+        if (!await _unitOfWork.ProjectTypes.ExistsAsync(request.ProjectTypeId, cancellationToken))
         {
-            throw new Exception(
-                "Location Manager must belong to the same Production Company.");
+            throw new KeyNotFoundException("Invalid Project Type.");
         }
+
+        var producer = await GetSameCompanyUserAsync(request.ProducerUserId, currentUser, "Producer", cancellationToken);
+        var locationManager = await GetSameCompanyUserAsync(request.LocationManagerUserId, currentUser, "Location Manager", cancellationToken);
 
         var project = new Project
         {
@@ -102,8 +64,8 @@ public class ProjectService : IProjectService
 
             ProjectTypeId = request.ProjectTypeId,
 
-            ProducerUserId = request.ProducerUserId,
-            LocationManagerUserId = request.LocationManagerUserId,
+            ProducerUserId = producer.UserId,
+            LocationManagerUserId = locationManager.UserId,
 
             WorkPermitImagePath = request.WorkPermitImagePath,
 
@@ -113,23 +75,231 @@ public class ProjectService : IProjectService
             IsActive = true
         };
 
-        await _unitOfWork.Projects.AddAsync(
-            project,
-            cancellationToken);
+        await _unitOfWork.Projects.AddAsync(project, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await _unitOfWork.SaveChangesAsync(
-            cancellationToken);
-
-        var createdProject =
-            await _unitOfWork.Projects.GetByIdAsync(
-                project.Id,
-                cancellationToken);
-
-        if (createdProject is null)
-            throw new Exception(
-                "Project could not be loaded after creation.");
+        var createdProject = await _unitOfWork.Projects.GetByIdAsync(project.Id, cancellationToken)
+            ?? throw new KeyNotFoundException("Project could not be loaded after creation.");
 
         return MapToDto(createdProject);
+    }
+
+    public async Task<List<ProjectDto>> GetAllAsync(
+        ProjectQueryDto query,
+        CancellationToken cancellationToken = default)
+    {
+        var projects = await _unitOfWork.Projects.GetAllAsync(
+            query.IsDeleted,
+            query.SearchTerm,
+            query.StartDate,
+            query.EndDate,
+            query.SearchByProductionCompanyName,
+            query.SearchByProductionCompanyId,
+            cancellationToken);
+
+        return projects.Select(MapToDto).ToList();
+    }
+
+    public async Task<ProjectDto> GetByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        var project = await _unitOfWork.Projects.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Project was not found.");
+
+        return MapToDto(project);
+    }
+
+    public async Task<ProjectDto> UpdateAsync(
+        int id,
+        UpdateProjectDto request,
+        int currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+
+        var project = await _unitOfWork.Projects.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Project was not found.");
+
+        EnsureSameProductionCompany(project, currentUser);
+
+        ValidateProjectPayload(
+            request.ProjectNameEn,
+            request.ProjectNameAr,
+            request.StartDate,
+            request.EndDate,
+            request.ProducerUserId,
+            request.LocationManagerUserId);
+
+        if (!await _unitOfWork.ProjectTypes.ExistsAsync(request.ProjectTypeId, cancellationToken))
+        {
+            throw new KeyNotFoundException("Invalid Project Type.");
+        }
+
+        var producer = await GetSameCompanyUserAsync(request.ProducerUserId, currentUser, "Producer", cancellationToken);
+        var locationManager = await GetSameCompanyUserAsync(request.LocationManagerUserId, currentUser, "Location Manager", cancellationToken);
+
+        project.ProjectNameEn = request.ProjectNameEn.Trim();
+        project.ProjectNameAr = request.ProjectNameAr.Trim();
+        project.StartDate = request.StartDate;
+        project.EndDate = request.EndDate;
+        project.ProjectTypeId = request.ProjectTypeId;
+        project.ProducerUserId = producer.UserId;
+        project.LocationManagerUserId = locationManager.UserId;
+
+        // Null/empty = no new file uploaded on this edit — keep the existing stored path.
+        if (!string.IsNullOrWhiteSpace(request.WorkPermitImagePath))
+        {
+            project.WorkPermitImagePath = request.WorkPermitImagePath;
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var updatedProject = await _unitOfWork.Projects.GetByIdAsync(project.Id, cancellationToken)
+            ?? throw new KeyNotFoundException("Project could not be loaded after update.");
+
+        return MapToDto(updatedProject);
+    }
+
+    public async Task DeleteAsync(
+        int id,
+        int currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+
+        var project = await _unitOfWork.Projects.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Project was not found.");
+
+        EnsureSameProductionCompany(project, currentUser);
+
+        // MaydanDbContext.SaveChangesAsync intercepts EntityState.Deleted for every SharedEntities
+        // and converts it into a soft delete (IsDeleted = true, DeletedAt = UtcNow) — this does not
+        // hard-delete the row.
+        _unitOfWork.Projects.Remove(project);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<ProjectDto> RestoreAsync(
+        int id,
+        int currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+
+        // GetByIdAsync would never find this project — the global soft-delete query filter
+        // excludes it precisely because it's deleted. GetByIdIncludingDeletedAsync bypasses that.
+        var project = await _unitOfWork.Projects.GetByIdIncludingDeletedAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Project was not found.");
+
+        EnsureSameProductionCompany(project, currentUser);
+
+        if (!project.IsDeleted)
+        {
+            throw new InvalidOperationException("Project is not deleted.");
+        }
+
+        project.IsDeleted = false;
+        project.DeletedAt = null;
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return MapToDto(project);
+    }
+
+    public async Task<List<ProjectTypeDto>> GetProjectTypesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var projectTypes = await _unitOfWork.ProjectTypes.GetAllAsync(cancellationToken);
+
+        return projectTypes
+            .Select(projectType => new ProjectTypeDto(projectType.Id, projectType.NameEn, projectType.NameAr))
+            .ToList();
+    }
+
+    private async Task<User> GetCurrentUserAsync(int currentUserId, CancellationToken cancellationToken)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Current user was not found.");
+
+        if (!user.IsActive)
+        {
+            throw new UnauthorizedAccessException("Current user is inactive.");
+        }
+
+        return user;
+    }
+
+    // Shared by CreateAsync/UpdateAsync — the same field-level validation both need.
+    private static void ValidateProjectPayload(
+        string projectNameEn,
+        string projectNameAr,
+        DateTime startDate,
+        DateTime endDate,
+        int producerUserId,
+        int locationManagerUserId)
+    {
+        if (string.IsNullOrWhiteSpace(projectNameEn))
+        {
+            throw new InvalidOperationException("English project name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(projectNameAr))
+        {
+            throw new InvalidOperationException("Arabic project name is required.");
+        }
+
+        if (projectNameEn.Trim().Length > 200)
+        {
+            throw new InvalidOperationException("English project name cannot exceed 200 characters.");
+        }
+
+        if (projectNameAr.Trim().Length > 200)
+        {
+            throw new InvalidOperationException("Arabic project name cannot exceed 200 characters.");
+        }
+
+        if (endDate <= startDate)
+        {
+            throw new InvalidOperationException("End date must be greater than start date.");
+        }
+
+        if (producerUserId == locationManagerUserId)
+        {
+            throw new InvalidOperationException("Producer and Location Manager must be different users.");
+        }
+    }
+
+    // Shared by CreateAsync/UpdateAsync — resolves a user and confirms it belongs to the same
+    // Production Company as the current user, the exact rule CreateAsync already enforced for
+    // both Producer and Location Manager.
+    private async Task<User> GetSameCompanyUserAsync(
+        int userId,
+        User currentUser,
+        string roleLabel,
+        CancellationToken cancellationToken)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException($"{roleLabel} not found.");
+
+        if (user.EntityType != EntityType.ProductionCompany || user.EntityId != currentUser.EntityId)
+        {
+            throw new InvalidOperationException($"{roleLabel} must belong to the same Production Company.");
+        }
+
+        return user;
+    }
+
+    // Update/Delete/Restore all act on an EXISTING project — this confirms the caller's own
+    // Production Company owns it. Same "acting outside your own entity" boundary
+    // UserManagementService.GetScopedUserAsync() enforces for Users ("Cannot manage users outside
+    // the current entity") — same exception type, same reasoning.
+    private static void EnsureSameProductionCompany(Project project, User currentUser)
+    {
+        if (project.ProductionCompanyId != currentUser.EntityId)
+        {
+            throw new UnauthorizedAccessException("Cannot manage a project outside the current Production Company.");
+        }
     }
 
     private static ProjectDto MapToDto(Project project)
@@ -162,7 +332,9 @@ public class ProjectService : IProjectService
 
             WorkPermitImagePath = project.WorkPermitImagePath,
 
-            ProductionCompanyId = project.ProductionCompanyId
+            ProductionCompanyId = project.ProductionCompanyId,
+
+            IsDeleted = project.IsDeleted
         };
     }
 }

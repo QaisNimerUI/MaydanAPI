@@ -1,15 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Maydan.Domain.Entities;
 
-namespace Maydan.Application.Interfaces
+namespace Maydan.Application.Interfaces;
+
+public interface IProjectTypeRepository
 {
-    public interface IProjectTypeRepository
-    {
-        Task<bool> ExistsAsync(
-            int projectTypeId,
-            CancellationToken cancellationToken = default);
-    }
+    Task<bool> ExistsAsync(
+        int projectTypeId,
+        CancellationToken cancellationToken = default);
+
+    // Backs GET /api/ProjectTypes — the real seeded catalog (PermissionSeedConfiguration's sibling,
+    // ProjectTypeSeed.cs, 15 rows) that project-form.component.ts's hardcoded
+    // ['Productions', 'Tourism', 'Events'] list should have been reading from all along.
+    Task<List<ProjectType>> GetAllAsync(
+        CancellationToken cancellationToken = default);
 }

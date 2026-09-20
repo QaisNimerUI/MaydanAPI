@@ -6,6 +6,7 @@ using Maydan.Application.Services;
 using Maydan.Infrastructure.Persistence;
 using Maydan.Infrastructure.Repositories;
 using Maydan.Infrastructure.Security;
+using Maydan.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -43,10 +44,21 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
 
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
+
+// Projects audit follow-up: no file-upload feature existed before this ticket, so no
+// wwwroot/static-files convention existed either. WebRootPath is null when wwwroot doesn't exist
+// on disk yet (first run) — falls back to ContentRootPath/wwwroot, which app.UseStaticFiles()
+// below will create/serve from the same place. Resolved here (not inside LocalFileStorageService
+// itself) so Maydan.Infrastructure stays free of any ASP.NET Core hosting reference.
+var uploadsRootPath = Path.Combine(
+    builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"),
+    "uploads");
+builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsRootPath));
 
 builder.Services.AddValidatorsFromAssembly(typeof(Maydan.Application.AssemblyReference).Assembly);
 
@@ -86,6 +98,10 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+
+// Serves whatever LocalFileStorageService saves under wwwroot/uploads (work permit images, etc.)
+// back out at the matching /uploads/... path.
+app.UseStaticFiles();
 
 app.UseCors("Frontend");
 
