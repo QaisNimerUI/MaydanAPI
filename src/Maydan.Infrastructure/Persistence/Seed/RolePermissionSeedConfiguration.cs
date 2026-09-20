@@ -52,11 +52,15 @@ namespace Maydan.Infrastructure.Persistence.Seed
 
         public void Configure(EntityTypeBuilder<RolePermission> builder)
         {
+            // ManageServices added per the associations.routes.ts permission-review correction:
+            // ASEZA has broad association oversight but no association-CRUD permission, so it was
+            // unreachable for the Association's own service-requests inbox (which now gates on
+            // ManageServices alone, not a Manage Association(s) CRUD proxy) until granted directly.
             var asezaPermissions = new[]
             {
                 ViewUsers, ViewAssociations, ManageAssociations, ViewAssociationUsers,
                 ViewProductionCompanies, ViewProductionHouses, ManageProductionHouses,
-                ViewWorkers, ViewProjects
+                ViewWorkers, ViewProjects, ManageServices
             };
 
             var productionHousePermissions = new[]
