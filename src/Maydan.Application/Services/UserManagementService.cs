@@ -35,6 +35,7 @@ public class UserManagementService : IUserManagementService
     {
         var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
         ValidateUserPayload(dto);
+        EnsureSameEntityCreation(currentUser, dto.RoleId);
 
         var email = dto.Email.Trim();
         if (await _unitOfWork.Users.EmailExistsAsync(email, cancellationToken))
@@ -400,6 +401,26 @@ public class UserManagementService : IUserManagementService
         }
 
         return users;
+    }
+
+    // Audit follow-up: CreateUserAsync below always stamps the new user's EntityType/EntityId from
+    // the CALLER (currentUser), never from dto.RoleId — correct only when the new account belongs
+    // to the same role (and therefore same entity) as the creator, which is the only case the real
+    // UI ever sends. UserCreateWizardComponent auto-derives RoleId from the creator's own session
+    // and never offers a role/entity picker at all, per its own comment on the confirmed
+    // "no cross-entity user creation" business rule. This guard turns a caller that bypasses the UI
+    // and requests a different RoleId (a raw API call, Postman, a future client bug) into an
+    // explicit rejection instead of the silent EntityType/EntityId mis-scoping that shipped before
+    // this check existed. Deliberately does NOT touch the EntityType/EntityId assignment itself —
+    // that logic is correct once this check guarantees same-role creation. Does not solve the
+    // separate, larger gap of onboarding a brand-new entity's first user of a *different* role —
+    // see maydan-entity-onboarding-gap.md.
+    private static void EnsureSameEntityCreation(User currentUser, int requestedRoleId)
+    {
+        if (requestedRoleId != currentUser.RoleId)
+        {
+            throw new InvalidOperationException("Cannot create a user with a different role than the current user's own role.");
+        }
     }
 
     private static void ValidateUserPayload(CreateEntityUserDto dto)
