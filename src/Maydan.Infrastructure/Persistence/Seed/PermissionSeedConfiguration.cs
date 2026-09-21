@@ -72,7 +72,25 @@ namespace Maydan.Infrastructure.Persistence.Seed
                 Seed(27, "Edit Projects", "تعديل المشاريع", "Projects"),
                 Seed(28, "Delete Projects", "حذف المشاريع", "Projects"),
                 Seed(29, "Review Projects", "مراجعة المشاريع", "Projects"),
-                Seed(30, "Manage Projects", "إدارة المشاريع", "Projects")
+                Seed(30, "Manage Projects", "إدارة المشاريع", "Projects"),
+
+                // Locations — product decision (2026-09-21): Bayt-AlUrdon-only for now (general
+                // reference catalog: countries/cities/city-locations), not entity-scoped.
+                Seed(31, "View Locations", "عرض المواقع", "Locations"),
+                Seed(32, "Manage Locations", "إدارة المواقع", "Locations"),
+
+                // Attendance — product decision (2026-09-21): View for all 4 real roles (oversight
+                // for Bayt-AlUrdon/ASEZA, own-project visibility for ProductionHouse/Association);
+                // Manage (recording/approving scans) restricted to Association + ProductionHouse,
+                // the two entities actually involved in the double-verification workflow.
+                Seed(33, "View Attendance", "عرض الحضور", "Attendance"),
+                Seed(34, "Manage Attendance", "إدارة الحضور", "Attendance"),
+
+                // Payments — product decision (2026-09-21): View for all 4 real roles (payroll has
+                // no approval workflow, just direct calculation/display); Manage restricted to
+                // Bayt-AlUrdon + ProductionHouse (the company paying), not Association or ASEZA.
+                Seed(35, "View Payments", "عرض الرواتب", "Payments"),
+                Seed(36, "Manage Payments", "إدارة الرواتب", "Payments")
             );
         }
     }
