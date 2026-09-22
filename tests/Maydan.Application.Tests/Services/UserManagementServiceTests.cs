@@ -181,5 +181,7 @@ public class UserManagementServiceTests
         public IWorkerRepository Workers => throw new NotSupportedException();
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
+
+        public Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default) => operation();
     }
 }

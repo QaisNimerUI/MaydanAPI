@@ -1,5 +1,6 @@
 using Maydan.Application.Interfaces;
 using Maydan.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maydan.Infrastructure.Repositories;
 
@@ -38,4 +39,11 @@ public class UnitOfWork : IUnitOfWork
     _projectTypes ??= new ProjectTypeRepository(_context);
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _context.SaveChangesAsync(cancellationToken);
+
+    public async Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await operation();
+        await transaction.CommitAsync(cancellationToken);
+    }
 }

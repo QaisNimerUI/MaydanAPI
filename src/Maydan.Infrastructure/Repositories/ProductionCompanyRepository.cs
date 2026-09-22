@@ -20,6 +20,9 @@ public class ProductionCompanyRepository : IProductionCompanyRepository
     public Task<List<ProductionCompany>> GetAllAsync(CancellationToken cancellationToken = default) =>
         _context.ProductionCompanies.ToListAsync(cancellationToken);
 
+    public Task<bool> RegistrationNumberExistsAsync(string registrationNumber, CancellationToken cancellationToken = default) =>
+        _context.ProductionCompanies.AnyAsync(p => p.RegistrationNumber == registrationNumber, cancellationToken);
+
     public async Task AddAsync(ProductionCompany productionCompany, CancellationToken cancellationToken = default) =>
         await _context.ProductionCompanies.AddAsync(productionCompany, cancellationToken);
 
