@@ -56,12 +56,13 @@ public class ProductionCompanyOnboardingService : IProductionCompanyOnboardingSe
 
         var phone = $"{dto.MobileCountryCode.Trim()}{dto.MobileNumber.Trim()}";
 
-        // See RegisterProductionCompanyDto's comment: the form collects one Latin-script
-        // FirstName/LastName, but User.cs requires FirstNameAr/LastNameAr as separate NOT NULL
-        // columns. Mirroring the Latin value into both is a deliberate stopgap, not a guess at
-        // transliteration — flagged to Yousef as worth a real Arabic-name field in a later stage.
-        var firstName = dto.AdminFirstName.Trim();
-        var lastName = dto.AdminLastName.Trim();
+        // Stage 3: real Arabic name fields arrived on the DTO — the Stage 1 stopgap that mirrored
+        // the Latin name into FirstNameAr/LastNameAr (to satisfy User.cs's NOT NULL columns without
+        // a real Arabic value) is gone.
+        var firstNameEn = dto.AdminFirstName.Trim();
+        var lastNameEn = dto.AdminLastName.Trim();
+        var firstNameAr = dto.AdminFirstNameAr.Trim();
+        var lastNameAr = dto.AdminLastNameAr.Trim();
 
         var company = new ProductionCompany
         {
@@ -80,10 +81,10 @@ public class ProductionCompanyOnboardingService : IProductionCompanyOnboardingSe
 
         var user = new User
         {
-            FirstNameEn = firstName,
-            LastNameEn = lastName,
-            FirstNameAr = firstName,
-            LastNameAr = lastName,
+            FirstNameEn = firstNameEn,
+            LastNameEn = lastNameEn,
+            FirstNameAr = firstNameAr,
+            LastNameAr = lastNameAr,
             Email = email,
             PhoneNumber = phone,
             PasswordHash = _passwordHasher.HashPassword(dto.Password),
@@ -129,6 +130,8 @@ public class ProductionCompanyOnboardingService : IProductionCompanyOnboardingSe
             string.IsNullOrWhiteSpace(dto.RegistrationNumber) ||
             string.IsNullOrWhiteSpace(dto.AdminFirstName) ||
             string.IsNullOrWhiteSpace(dto.AdminLastName) ||
+            string.IsNullOrWhiteSpace(dto.AdminFirstNameAr) ||
+            string.IsNullOrWhiteSpace(dto.AdminLastNameAr) ||
             string.IsNullOrWhiteSpace(dto.MobileCountryCode) ||
             string.IsNullOrWhiteSpace(dto.MobileNumber) ||
             string.IsNullOrWhiteSpace(dto.Email) ||

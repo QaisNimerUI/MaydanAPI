@@ -20,6 +20,8 @@ public class ProductionCompanyOnboardingServiceTests
         CityId: 1,
         AdminFirstName: "Sam",
         AdminLastName: "Carter",
+        AdminFirstNameAr: "سام",
+        AdminLastNameAr: "كارتر",
         MobileCountryCode: "+962",
         MobileNumber: "799999999",
         Email: "sam.carter@example.org",
@@ -66,6 +68,10 @@ public class ProductionCompanyOnboardingServiceTests
         Assert.False(user.MustResetPassword);
         Assert.True(user.IsActive);
         Assert.Equal("hashed:P@ssw0rd!", user.PasswordHash);
+        Assert.Equal("Sam", user.FirstNameEn);
+        Assert.Equal("Carter", user.LastNameEn);
+        Assert.Equal("سام", user.FirstNameAr);
+        Assert.Equal("كارتر", user.LastNameAr);
 
         // Full role permission set, not a hand-picked subset — and the inactive row excluded.
         var grantedPermissionIds = user.UserPermissions.Select(up => up.PermissionId).OrderBy(id => id).ToList();
@@ -73,6 +79,31 @@ public class ProductionCompanyOnboardingServiceTests
 
         Assert.Equal(companyRepository.AddedCompany.Id, result.ProductionCompanyId);
         Assert.Equal(user.UserId, result.AdminUserId);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_ArabicNameStoredAsGiven_NotDerivedFromLatinName()
+    {
+        // Stage 3 regression guard: Stage 1's stopgap duplicated the Latin name into
+        // FirstNameAr/LastNameAr. Using values that share no characters with their Latin
+        // counterparts makes any regression back to that behavior fail loudly.
+        var dto = ValidDto() with { AdminFirstNameAr = "محمد", AdminLastNameAr = "العبدالله" };
+
+        var role = ProductionHouseRoleWithPermissions();
+        var userRepository = new FakeUserRepository();
+        var companyRepository = new FakeProductionCompanyRepository();
+        var unitOfWork = new FakeUnitOfWork(userRepository, companyRepository, new FakeRoleRepository(role), new FakeCityRepository(cityExists: true));
+        var service = new ProductionCompanyOnboardingService(unitOfWork, new FakePasswordHasher());
+
+        await service.RegisterAsync(dto);
+
+        var user = userRepository.AddedUser!;
+        Assert.Equal("محمد", user.FirstNameAr);
+        Assert.Equal("العبدالله", user.LastNameAr);
+        Assert.Equal("Sam", user.FirstNameEn);
+        Assert.Equal("Carter", user.LastNameEn);
+        Assert.NotEqual(user.FirstNameEn, user.FirstNameAr);
+        Assert.NotEqual(user.LastNameEn, user.LastNameAr);
     }
 
     [Fact]

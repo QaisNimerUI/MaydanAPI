@@ -34,9 +34,10 @@ public record AuthUserDto(
 
 // Entity onboarding Stage 1 (2026-09-22): public production-company self-registration — company +
 // its first admin in one submission, active immediately (confirmed product decision). Matches
-// production-house-signup.component.ts's form fields field-for-field: that form collects a single
-// (Latin-script) FirstName/LastName for the admin, not the Ar/En pair User.cs requires — see
-// ProductionCompanyOnboardingService's own comment on how that gap is bridged for now.
+// production-house-signup.component.ts's form fields field-for-field.
+// Stage 3 (2026-09-22): AdminFirstNameAr/AdminLastNameAr added now that the form collects the
+// admin's real Arabic name — naming mirrors AdminFirstName/AdminLastName's own "Admin" prefix,
+// plus the "NameAr" suffix Stage 2's OnboardAssociationAdminDto already established.
 public record RegisterProductionCompanyDto(
     string CompanyNameEn,
     string CompanyNameAr,
@@ -44,6 +45,8 @@ public record RegisterProductionCompanyDto(
     int CityId,
     string AdminFirstName,
     string AdminLastName,
+    string AdminFirstNameAr,
+    string AdminLastNameAr,
     string MobileCountryCode,
     string MobileNumber,
     string Email,
