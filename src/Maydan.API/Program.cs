@@ -46,6 +46,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IProductionCompanyOnboardingService, ProductionCompanyOnboardingService>();
+builder.Services.AddScoped<IEntityOnboardingService, EntityOnboardingService>();
 
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();

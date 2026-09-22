@@ -59,6 +59,14 @@ namespace Maydan.Infrastructure.Persistence.Seed
         private const int ViewPayments = 35;
         private const int ManagePayments = 36;
 
+        // Entity onboarding Stage 2 (2026-09-22) — matching PermissionSeedConfiguration.cs id 37.
+        // Bayt-AlUrdon only: not added to asezaPermissions/productionHousePermissions/
+        // associationPermissions below. A dedicated permission rather than reusing
+        // ManageAssociations (which ASEZA also holds, for its own broader oversight, but ASEZA
+        // must NOT be able to create an Association's first admin) or ManageUsers (which doesn't
+        // exist as a real seeded grant for this action's cross-entity shape at all).
+        private const int OnboardEntities = 37;
+
         public void Configure(EntityTypeBuilder<RolePermission> builder)
         {
             // ManageServices added per the associations.routes.ts permission-review correction:
@@ -105,7 +113,7 @@ namespace Maydan.Infrastructure.Persistence.Seed
                 ViewPayments
             };
 
-            var allPermissionIds = Enumerable.Range(1, 36);
+            var allPermissionIds = Enumerable.Range(1, 37);
 
             var grants = ForRole(BaytAlUrdon, allPermissionIds)
                 .Concat(ForRole(Aseza, asezaPermissions))

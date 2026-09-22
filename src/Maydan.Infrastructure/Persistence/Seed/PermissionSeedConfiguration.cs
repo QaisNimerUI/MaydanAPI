@@ -90,7 +90,14 @@ namespace Maydan.Infrastructure.Persistence.Seed
                 // no approval workflow, just direct calculation/display); Manage restricted to
                 // Bayt-AlUrdon + ProductionHouse (the company paying), not Association or ASEZA.
                 Seed(35, "View Payments", "عرض الرواتب", "Payments"),
-                Seed(36, "Manage Payments", "إدارة الرواتب", "Payments")
+                Seed(36, "Manage Payments", "إدارة الرواتب", "Payments"),
+
+                // Entity onboarding Stage 2 (2026-09-22): gates picking an existing, admin-less
+                // Association and creating its first admin user (Bayt-AlUrdon only — Associations
+                // are pre-seeded from GIS data, never created here). Deliberately its own dedicated
+                // permission, not a reuse of ManageAssociations/ManageUsers — see
+                // RolePermissionSeedConfiguration.cs's own comment on why.
+                Seed(37, "Onboard Entities", "استيعاب الجهات", "Onboarding")
             );
         }
     }
