@@ -1,5 +1,6 @@
 using System.Text;
 using FluentValidation;
+using Maydan.API.Filters;
 using Maydan.API.Security;
 using Maydan.Application.Interfaces;
 using Maydan.Application.Services;
@@ -17,7 +18,10 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 
-builder.Services.AddControllers();
+// System Configuration gate (MAYD-133, 2026-09-24): registered globally so a newly added
+// controller is gated by default (opt OUT via [BypassSystemConfigurationGate], not opt in) — see
+// SystemConfigurationGateFilter's own comment.
+builder.Services.AddControllers(options => options.Filters.Add<SystemConfigurationGateFilter>());
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -54,6 +58,15 @@ builder.Services.AddScoped<IFrontendLinkBuilder, FrontendLinkBuilder>();
 // LoggingEmailSender's own comment; swap this one registration for a real implementation once
 // Yousef picks a provider.
 builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+
+// System Configuration gate (MAYD-133, 2026-09-24). AddDataProtection() with no persistence
+// configuration stores keys under the local user profile by default — fine for a single-instance
+// Dev/QA box, but will NOT survive across multiple instances/containers without shared key storage
+// configured. See DataProtectionSecretProtector's own comment; flagged to Yousef.
+builder.Services.AddDataProtection();
+builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
+builder.Services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
+builder.Services.AddScoped<ISystemConfigurationGateService, SystemConfigurationGateService>();
 
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();

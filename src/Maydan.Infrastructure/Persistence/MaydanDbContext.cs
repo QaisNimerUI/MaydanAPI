@@ -33,6 +33,7 @@ public class MaydanDbContext : DbContext
     public DbSet<Worker> Workers => Set<Worker>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

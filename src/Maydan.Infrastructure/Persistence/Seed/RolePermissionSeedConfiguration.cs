@@ -67,6 +67,10 @@ namespace Maydan.Infrastructure.Persistence.Seed
         // exist as a real seeded grant for this action's cross-entity shape at all).
         private const int OnboardEntities = 37;
 
+        // System Configuration gate (MAYD-133, 2026-09-24) — matching PermissionSeedConfiguration.cs
+        // id 38. Bayt-AlUrdon only, same as OnboardEntities above.
+        private const int ManageSystemConfiguration = 38;
+
         public void Configure(EntityTypeBuilder<RolePermission> builder)
         {
             // ManageServices added per the associations.routes.ts permission-review correction:
@@ -113,7 +117,7 @@ namespace Maydan.Infrastructure.Persistence.Seed
                 ViewPayments
             };
 
-            var allPermissionIds = Enumerable.Range(1, 37);
+            var allPermissionIds = Enumerable.Range(1, 38);
 
             var grants = ForRole(BaytAlUrdon, allPermissionIds)
                 .Concat(ForRole(Aseza, asezaPermissions))

@@ -6,6 +6,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- System Configuration gate (MAYD-133, 2026-09-24): gives this class library access to
+         ASP.NET Core's built-in Data Protection API (IDataProtectionProvider/IDataProtector),
+         used by DataProtectionSecretProtector to encrypt the SMTP password at rest — see that
+         class's own comment for why. FrameworkReference (not a versioned NuGet package) since
+         Data Protection ships in the ASP.NET Core shared framework already installed for
+         Maydan.API; this keeps the version tied to the installed runtime instead of picking one
+         by hand. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

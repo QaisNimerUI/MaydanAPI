@@ -97,7 +97,12 @@ namespace Maydan.Infrastructure.Persistence.Seed
                 // are pre-seeded from GIS data, never created here). Deliberately its own dedicated
                 // permission, not a reuse of ManageAssociations/ManageUsers — see
                 // RolePermissionSeedConfiguration.cs's own comment on why.
-                Seed(37, "Onboard Entities", "استيعاب الجهات", "Onboarding")
+                Seed(37, "Onboard Entities", "استيعاب الجهات", "Onboarding"),
+
+                // System Configuration gate (MAYD-133, 2026-09-24): gates the SMTP configuration
+                // admin screen (SystemConfigurationController). Bayt-AlUrdon only — same
+                // dedicated-permission shape as Onboard Entities above, not a reuse of ManageUsers.
+                Seed(38, "Manage System Configuration", "إدارة إعدادات النظام", "SystemConfiguration")
             );
         }
     }

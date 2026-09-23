@@ -15,6 +15,7 @@ public interface IUnitOfWork
     IWorkerRepository Workers { get; }
     IPasswordResetTokenRepository PasswordResetTokens { get; }
     IRefreshTokenRepository RefreshTokens { get; }
+    ISystemConfigurationRepository SystemConfigurations { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

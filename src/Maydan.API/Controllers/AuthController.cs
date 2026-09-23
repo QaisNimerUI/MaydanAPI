@@ -1,3 +1,4 @@
+using Maydan.API.Filters;
 using Maydan.Application.DTOs.Auth;
 using Maydan.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,14 @@ namespace Maydan.API.Controllers;
 // point these actions run. AllowAnonymous is explicit here so this reads as an intentional
 // choice, not an oversight, now that GroupsController/PermissionsController/UsersController
 // all carry [Authorize].
+//
+// [BypassSystemConfigurationGate] (MAYD-133, 2026-09-24): most of this controller predates having
+// any session at all, so the gate would never fire for it anyway — but logout() does run with a
+// real Bearer token from an authenticated super admin, and Business Rule #5 explicitly carves out
+// "auth/logout" as always reachable regardless of configuration state (an unconfigured super admin
+// must still be able to log out).
 [AllowAnonymous]
+[BypassSystemConfigurationGate]
 [Route("api/auth")]
 public class AuthController : ApiControllerBase
 {
