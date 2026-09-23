@@ -20,6 +20,7 @@ public class UnitOfWork : IUnitOfWork
     private IProjectRepository? _projects;
     private IWorkerRepository? _workers;
     private IPasswordResetTokenRepository? _passwordResetTokens;
+    private IRefreshTokenRepository? _refreshTokens;
 
     public UnitOfWork(MaydanDbContext context)
     {
@@ -37,6 +38,7 @@ public class UnitOfWork : IUnitOfWork
     public IProjectRepository Projects => _projects ??= new ProjectRepository(_context);
     public IWorkerRepository Workers => _workers ??= new WorkerRepository(_context);
     public IPasswordResetTokenRepository PasswordResetTokens => _passwordResetTokens ??= new PasswordResetTokenRepository(_context);
+    public IRefreshTokenRepository RefreshTokens => _refreshTokens ??= new RefreshTokenRepository(_context);
     public IProjectTypeRepository ProjectTypes =>
     _projectTypes ??= new ProjectTypeRepository(_context);
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>

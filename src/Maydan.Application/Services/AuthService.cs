@@ -60,13 +60,29 @@ public class AuthService : IAuthService
 
         var token = _jwtTokenGenerator.GenerateAccessToken(authUser);
 
+        string? refreshToken = null;
+        DateTime? refreshTokenExpiresAtUtc = null;
+
+        // "Remember me" (MAYD-131/132, decision confirmed 2026-09-23): a refresh token is issued
+        // ONLY when the caller opted in. Left unchecked, the session naturally ends when this access
+        // token expires (or the browser/tab closes) — no separate "remember me" storage or logic is
+        // needed anywhere; the mere presence of a refresh token on the client IS the remember-me
+        // state. This reuses the refresh-token mechanism itself rather than building two parallel
+        // systems for Business Rules #7 and #8.
+        if (dto.RememberMe)
+        {
+            (refreshToken, refreshTokenExpiresAtUtc) = await IssueRefreshTokenAsync(user.UserId, cancellationToken);
+        }
+
         return new LoginResponseDto(
             true,
             false,
             token.AccessToken,
             token.ExpiresAtUtc,
             authUser,
-            "Login successful.");
+            "Login successful.",
+            refreshToken,
+            refreshTokenExpiresAtUtc);
     }
 
     public async Task<LoginResponseDto> ResetPasswordAsync(ResetPasswordDto dto, CancellationToken cancellationToken = default)
@@ -106,6 +122,11 @@ public class AuthService : IAuthService
 
         trackedUser.PasswordHash = _passwordHasher.HashPassword(dto.NewPassword);
         trackedUser.MustResetPassword = false;
+        // Security hardening (MAYD-131/132, 2026-09-23): a password change kills every OTHER active
+        // session too, not just this request's own. Mutates in-memory only, folded into this same
+        // save — same "mutate several tracked entities, save once" shape ForgotPasswordAsync's own
+        // outstanding-reset-token invalidation already uses.
+        await RevokeAllActiveRefreshTokensAsync(trackedUser.UserId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var authUser = MapAuthUser(user);
@@ -235,9 +256,173 @@ public class AuthService : IAuthService
         matched.IsUsed = true;
         matched.UsedAtUtc = DateTime.UtcNow;
 
+        // Security hardening (MAYD-131/132, 2026-09-23): same reasoning as ResetPasswordAsync's own
+        // comment — a real recovery via this token proves the caller controls the account at least
+        // as strongly as knowing the current password does, so every other active session is killed
+        // here too, not just left dangling until it separately expires.
+        await RevokeAllActiveRefreshTokensAsync(user.UserId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ResetPasswordWithTokenResponseDto("Your password has been reset. You can now log in.");
+    }
+
+    // Real 3-week session persistence (MAYD-131/132, 2026-09-23). Validates the presented refresh
+    // token and, on success, ROTATES it: the old one is revoked and points (ReplacedByTokenId) at
+    // its replacement, and the new one carries a fresh sliding expiry (Business Rule #7's "3-week
+    // session", read as a sliding window that resets on every successful use — an actively-used
+    // session should never be unexpectedly logged out mid-use, while one genuinely abandoned for the
+    // full window still expires; see this stage's own completion report for why the fixed-from-login
+    // reading was rejected).
+    //
+    // If the SAME raw token is presented again after having already been rotated away
+    // (matched.IsRevoked && matched.ReplacedByTokenId.HasValue), that is a real reuse-of-an-already-
+    // exchanged-token signal — a strong indicator the token value leaked and is now being replayed,
+    // not just "an old session that ended normally" (a token revoked directly via logout or a
+    // password change has IsRevoked set but ReplacedByTokenId left null — see RefreshToken.cs's own
+    // comment on that distinction). The response is to revoke every other still-active refresh token
+    // for that user, forcing a full re-login everywhere rather than silently tolerating the reuse.
+    public async Task<RefreshTokenResponseDto> RefreshTokenAsync(RefreshTokenRequestDto dto, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+        {
+            throw new InvalidOperationException("Refresh token is required.");
+        }
+
+        var candidates = await _unitOfWork.RefreshTokens.GetAllAsync(cancellationToken);
+        var matched = candidates.FirstOrDefault(t => _passwordHasher.VerifyPassword(dto.RefreshToken, t.TokenHash));
+
+        // UnauthorizedAccessException (not InvalidOperationException) for every case below where the
+        // token itself is the problem — this is a credential-validation failure, the same category
+        // as LoginAsync's own bad-credentials check above, not an input-shape error. AuthController's
+        // Refresh action gives this the same explicit 401 treatment Login's own catch block does
+        // (HandleException alone would map UnauthorizedAccessException to 403 Forbid, which is wrong
+        // here — see ApiControllerBase.HandleException). Deliberately distinct from
+        // ResetPasswordWithTokenAsync's own invalid/expired/used checks above, which stay
+        // InvalidOperationException/400 — that token is a one-time claim ticket proving control of an
+        // email inbox, not a standing credential the way a refresh token is.
+        if (matched is null)
+        {
+            throw new UnauthorizedAccessException("This refresh token is invalid.");
+        }
+
+        if (matched.IsRevoked)
+        {
+            if (matched.ReplacedByTokenId.HasValue)
+            {
+                await RevokeAllActiveRefreshTokensAsync(matched.UserId, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+
+            throw new UnauthorizedAccessException("This refresh token has already been used.");
+        }
+
+        if (matched.ExpiresAtUtc < DateTime.UtcNow)
+        {
+            throw new UnauthorizedAccessException("This refresh token has expired.");
+        }
+
+        // GetWithPermissionsAsync (not GetByIdAsync) — MapAuthUser needs the full Role/Permissions
+        // graph, the same reason ResetPasswordAsync's own comment gives for why GetByIdAsync alone
+        // isn't enough there.
+        var user = await _unitOfWork.Users.GetWithPermissionsAsync(matched.UserId, cancellationToken);
+        if (user is null || !user.IsActive)
+        {
+            throw new UnauthorizedAccessException("This refresh token is invalid.");
+        }
+
+        var accessToken = _jwtTokenGenerator.GenerateAccessToken(MapAuthUser(user));
+        var generatedRefresh = _jwtTokenGenerator.GenerateRefreshToken();
+        var newRefreshToken = new RefreshToken
+        {
+            UserId = matched.UserId,
+            TokenHash = _passwordHasher.HashPassword(generatedRefresh.RawToken),
+            ExpiresAtUtc = generatedRefresh.ExpiresAtUtc,
+            IsRevoked = false
+        };
+
+        // Two SaveChangesAsync calls, not one: see IUnitOfWork.ExecuteInTransactionAsync's own
+        // comment on why — newRefreshToken.Id doesn't exist until it's actually saved, but matched
+        // (the old token) needs that Id for its own ReplacedByTokenId pointer.
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await _unitOfWork.RefreshTokens.AddAsync(newRefreshToken, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            matched.IsRevoked = true;
+            matched.RevokedAtUtc = DateTime.UtcNow;
+            matched.ReplacedByTokenId = newRefreshToken.Id;
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        return new RefreshTokenResponseDto(accessToken.AccessToken, accessToken.ExpiresAtUtc, generatedRefresh.RawToken, generatedRefresh.ExpiresAtUtc);
+    }
+
+    // Finally implements what the frontend has called for a while (AuthService.ts's own logout()) —
+    // revokes the presented refresh token server-side. Always returns the same generic success
+    // message regardless of whether the token was real, already revoked, or missing entirely: this
+    // isn't an enumeration-safety requirement like ForgotPasswordAsync's (the caller already
+    // possesses whatever value was in their own storage, there's nothing to probe), it just keeps
+    // logout simple and idempotent — matching the frontend's own "best-effort backend call, always
+    // clean up locally" pattern, logout can't meaningfully "fail" from the caller's point of view.
+    public async Task<LogoutResponseDto> LogoutAsync(LogoutRequestDto dto, CancellationToken cancellationToken = default)
+    {
+        const string message = "Logged out.";
+
+        if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+        {
+            return new LogoutResponseDto(message);
+        }
+
+        var candidates = await _unitOfWork.RefreshTokens.GetAllAsync(cancellationToken);
+        var matched = candidates.FirstOrDefault(t => _passwordHasher.VerifyPassword(dto.RefreshToken, t.TokenHash));
+
+        if (matched is not null && !matched.IsRevoked)
+        {
+            matched.IsRevoked = true;
+            matched.RevokedAtUtc = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return new LogoutResponseDto(message);
+    }
+
+    // "Remember me" (MAYD-131/132): only reached from LoginAsync when RememberMe was true. A single
+    // save is enough here — unlike RefreshTokenAsync's rotation above, there's no older token that
+    // needs this new one's generated Id, so no ExecuteInTransactionAsync/two-step save is needed.
+    private async Task<(string RawToken, DateTime ExpiresAtUtc)> IssueRefreshTokenAsync(int userId, CancellationToken cancellationToken)
+    {
+        var generated = _jwtTokenGenerator.GenerateRefreshToken();
+        var refreshToken = new RefreshToken
+        {
+            UserId = userId,
+            TokenHash = _passwordHasher.HashPassword(generated.RawToken),
+            ExpiresAtUtc = generated.ExpiresAtUtc,
+            IsRevoked = false
+        };
+
+        await _unitOfWork.RefreshTokens.AddAsync(refreshToken, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return (generated.RawToken, generated.ExpiresAtUtc);
+    }
+
+    // Security hardening (MAYD-131/132, 2026-09-23): a password change (through any of the paths
+    // that touch PasswordHash — see the two call sites above) kills every other active session, not
+    // just the one making the change. Mutates in-memory only; callers fold this into their own
+    // existing SaveChangesAsync call, the same "mutate several tracked entities, save once" shape
+    // ForgotPasswordAsync's own outstanding-reset-token invalidation already uses — except in
+    // RefreshTokenAsync's reuse-detected branch, which has no other save to piggyback on and issues
+    // its own immediately after.
+    private async Task RevokeAllActiveRefreshTokensAsync(int userId, CancellationToken cancellationToken)
+    {
+        var tokens = await _unitOfWork.RefreshTokens.GetAllAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+
+        foreach (var token in tokens.Where(t => t.UserId == userId && !t.IsRevoked))
+        {
+            token.IsRevoked = true;
+            token.RevokedAtUtc = now;
+        }
     }
 
     // 256 bits of entropy, base64url-encoded so it's safe to place directly in a URL query string

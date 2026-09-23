@@ -32,6 +32,7 @@ public class MaydanDbContext : DbContext
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Worker> Workers => Set<Worker>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

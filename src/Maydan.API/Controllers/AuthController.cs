@@ -90,6 +90,45 @@ public class AuthController : ApiControllerBase
         }
     }
 
+    // Real 3-week session persistence (MAYD-131/132, 2026-09-23). Same AllowAnonymous rationale as
+    // the rest of this controller — a refresh call happens precisely when no valid access token
+    // exists, so there's nothing to Authorize against yet; the refresh token in the body is what
+    // proves the caller's identity here.
+    [HttpPost("refresh", Name = "Refresh Access Token")]
+    public async Task<ActionResult<RefreshTokenResponseDto>> Refresh([FromBody] RefreshTokenRequestDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _authService.RefreshTokenAsync(dto, cancellationToken));
+        }
+        // Same explicit 401 treatment as Login's own catch above — HandleException alone maps
+        // UnauthorizedAccessException to 403 Forbid, which is the wrong signal for "this refresh
+        // token is invalid/expired/already used" (see AuthService.RefreshTokenAsync's own comment).
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(new { message = exception.Message });
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
+
+    // Real 3-week session persistence (MAYD-131/132, 2026-09-23) — finally implements what the
+    // frontend's AuthService.ts has called for a while (see that file's own comment history).
+    [HttpPost("logout", Name = "Logout")]
+    public async Task<ActionResult<LogoutResponseDto>> Logout([FromBody] LogoutRequestDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _authService.LogoutAsync(dto, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
+
     // Entity onboarding Stage 1 (2026-09-22): public production-company self-registration — same
     // AllowAnonymous rationale as the rest of this controller, since there's no session at all yet
     // (not even a user to log in as until this call succeeds). Instant activation (confirmed

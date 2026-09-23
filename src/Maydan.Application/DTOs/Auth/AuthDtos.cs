@@ -6,6 +6,11 @@ public class LoginRequestDto
 {
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    // Real 3-week session persistence / "remember me" (MAYD-131/132, 2026-09-23). Defaults to false
+    // (bool's own default) so any caller that doesn't send this field at all keeps today's exact
+    // behavior — access-token-only, no refresh token issued. See AuthService.LoginAsync's own
+    // comment for why a refresh token being issued at all IS the "remember me" mechanism.
+    public bool RememberMe { get; set; }
 }
 
 public record ResetPasswordDto(string Email, string CurrentPassword, string NewPassword);
@@ -25,13 +30,39 @@ public record ResetPasswordWithTokenDto(string Token, string NewPassword, string
 
 public record ResetPasswordWithTokenResponseDto(string Message);
 
+// Real 3-week session persistence / "remember me" (MAYD-131/132, 2026-09-23). Every field here is
+// non-nullable/required — unlike the password-reset DTOs, there is no "may or may not have
+// happened" outcome for a successful refresh: it either throws (invalid/expired/already-used token)
+// or returns a genuinely fresh access+refresh token pair, always both together (rotation).
+public record RefreshTokenRequestDto(string RefreshToken);
+
+public record RefreshTokenResponseDto(
+    string AccessToken,
+    DateTime AccessTokenExpiresAtUtc,
+    string RefreshToken,
+    DateTime RefreshTokenExpiresAtUtc);
+
+// Deliberately always the same generic success message regardless of whether the presented token
+// was real, already revoked, or missing entirely — see AuthService.LogoutAsync's own comment on why
+// that keeps this endpoint simple and idempotent rather than a security requirement like
+// ForgotPasswordAsync's enumeration-safety.
+public record LogoutRequestDto(string RefreshToken);
+
+public record LogoutResponseDto(string Message);
+
 public record LoginResponseDto(
     bool IsAuthenticated,
     bool MustResetPassword,
     string? AccessToken,
     DateTime? AccessTokenExpiresAtUtc,
     AuthUserDto? User,
-    string? Message);
+    string? Message,
+    // Real 3-week session persistence / "remember me" (MAYD-131/132, 2026-09-23). Non-null ONLY when
+    // LoginRequestDto.RememberMe was true (see AuthService.LoginAsync) — every other caller of this
+    // record (the mustResetPassword branch, ResetPasswordAsync's own success response) leaves these
+    // at their default null, identical to today's shape.
+    string? RefreshToken = null,
+    DateTime? RefreshTokenExpiresAtUtc = null);
 
 public record AuthUserDto(
     int UserId,

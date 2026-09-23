@@ -283,6 +283,7 @@ public class EntityOnboardingServiceTests
         public IProjectRepository Projects => throw new NotSupportedException();
         public IWorkerRepository Workers => throw new NotSupportedException();
         public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
+        public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
 
