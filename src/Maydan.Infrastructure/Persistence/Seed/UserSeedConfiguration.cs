@@ -89,6 +89,45 @@ namespace Maydan.Infrastructure.Persistence.Seed
                     CreatedAt = seedDate,
                     UpdatedAt = seedDate,
                     IsDeleted = false
+                },
+                new User
+                {
+                    // MAYD-135 (2026-09-24): real Association test account — needed for a real E2E
+                    // login while verifying the sidebar-visibility fix, and none of the existing
+                    // Association-role rows in Dev (UserId 11-14, ad hoc test debris) have a known
+                    // password. Same UserId-1000-range convention as the ASEZA admin above.
+                    UserId = 1001,
+
+                    FirstNameEn = "Association",
+                    LastNameEn = "Tester",
+
+                    FirstNameAr = "جمعية",
+                    LastNameAr = "اختبار",
+
+                    PhoneNumber = "+962770000025",
+                    Email = "association-tester@example.org",
+
+                    // Test credentials (2026-09-24). Same real IPasswordHasher, password: Assoc@12345.
+                    PasswordHash = "PBKDF2-SHA256.100000.Neiqo3DL9KA6VnPDZZgaWQ==.euR5zQ/Skjf64sJn7SnvR/IDgkd5c/CgJLLfx9HjaXU=",
+
+                    RoleId = 4,
+
+                    EntityType = EntityType.Association,
+
+                    // Unlike BaytAlUrdon/Aseza above, EntityType.Association IS meant to be a real FK
+                    // to Association.Id (User.cs's own comment) — but zero real Association rows
+                    // exist in this Dev DB (no AssociationsController exists on the backend yet, a
+                    // separate, larger, already-flagged gap — see the association-admin-fix task's
+                    // report). EntityId = 1 here is a placeholder, not a real reference, same as it
+                    // would be for any Association user created today until that gap closes.
+                    EntityId = 1,
+
+                    MustResetPassword = false,
+                    IsActive = true,
+
+                    CreatedAt = seedDate,
+                    UpdatedAt = seedDate,
+                    IsDeleted = false
                 }
             );
         }
