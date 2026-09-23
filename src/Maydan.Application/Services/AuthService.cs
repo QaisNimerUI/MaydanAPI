@@ -103,17 +103,23 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Invalid email or password.");
         }
 
-        // Decision: reject rather than silently allow when MustResetPassword is already false. This
-        // endpoint exists specifically to satisfy the forced-reset flow; an account that isn't
-        // flagged for it has no business changing its password through an unauthenticated,
-        // current-password-only endpoint. A general "change my password" feature for already-fine
-        // accounts is a different, separate concern (see AuthService.ts's own `changePassword`,
-        // which targets a different, not-yet-implemented endpoint) and isn't what this ticket adds.
-        if (!user.MustResetPassword)
-        {
-            throw new InvalidOperationException("Password reset is not required for this account.");
-        }
-
+        // Login/register cleanup follow-up (2026-09-23): the MustResetPassword gate that used to sit
+        // here is REMOVED — real bug found via a live browser test of the new (authenticated)
+        // ChangePasswordComponent (workforcment), which reuses this exact endpoint the same way
+        // ForcePasswordResetComponent already does. That gate made this endpoint unconditionally
+        // reject any caller whose account wasn't already flagged for a forced reset — including one
+        // who supplied the exact correct current password — which is wrong now that a second,
+        // legitimate caller exists: an already-logged-in user who knows their password and simply
+        // wants to change it. The real security boundary here is (and always was) the current-
+        // password verification directly above; MustResetPassword never gated WHETHER the caller was
+        // allowed to change their password, only which UI flow happened to be calling. Confirmed via
+        // a real grep of every caller before removing this: ForcePasswordResetComponent (the forced-
+        // reset flow this was originally built for) doesn't depend on the check being present, only
+        // on the password being correct, so it's unaffected; ResetPasswordComponent (the older public
+        // "change password" page, still reachable but unlinked from login/register) was actually
+        // ALSO broken by this same gate for any account not mid-forced-reset — this fixes that too,
+        // as a side effect, not a regression.
+        //
         // GetByEmailWithAccessAsync above is AsNoTracking (needed for the full Role/Permissions
         // graph MapAuthUser reads), so it can't be mutated and saved directly. Re-fetch a tracked
         // instance for the write; the no-tracking `user` from above remains valid for MapAuthUser.

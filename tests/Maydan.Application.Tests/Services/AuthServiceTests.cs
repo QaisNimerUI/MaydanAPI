@@ -544,14 +544,25 @@ public class AuthServiceTests
                 () => service.ResetPasswordAsync(new ResetPasswordDto(user.Email, "WrongPassword!", "NewP@ssw0rd!")));
         }
 
+        // Login/register cleanup follow-up (2026-09-23): the MustResetPassword gate this test used to
+        // cover (rejecting ANY caller whose account wasn't already flagged for a forced reset) was
+        // removed from AuthService.ResetPasswordAsync itself — real bug found via a live browser test
+        // of the new (authenticated) ChangePasswordComponent, which reuses this exact endpoint and
+        // was getting rejected even with the correct current password. This test now confirms the
+        // opposite of what it used to: a normal, already-fine account (the real case
+        // ChangePasswordComponent hits) CAN voluntarily change its password here, same as the forced-
+        // reset case above — the current-password check is the only real gate this endpoint needs.
         [Fact]
-        public async Task MustResetPasswordAlreadyFalse_Rejected()
+        public async Task NormalAccount_MustResetPasswordAlreadyFalse_CanStillVoluntarilyChangePassword()
         {
             var user = ActiveUser(mustResetPassword: false);
-            var (service, _, _, _, _, _) = CreateService(user);
+            var (service, users, _, _, _, _) = CreateService(user);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => service.ResetPasswordAsync(new ResetPasswordDto(user.Email, "OldP@ssw0rd!", "NewP@ssw0rd!")));
+            var result = await service.ResetPasswordAsync(new ResetPasswordDto(user.Email, "OldP@ssw0rd!", "NewP@ssw0rd!"));
+
+            Assert.True(new PasswordHasher().VerifyPassword("NewP@ssw0rd!", users.TrackedUser!.PasswordHash));
+            Assert.False(users.TrackedUser.MustResetPassword);
+            Assert.NotNull(result.AccessToken);
         }
 
         // Security hardening (MAYD-131/132, 2026-09-23): a password change through THIS path (the
