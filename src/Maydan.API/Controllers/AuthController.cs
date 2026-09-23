@@ -57,6 +57,39 @@ public class AuthController : ApiControllerBase
         }
     }
 
+    // Forgot-password recovery, step 1 (MAYD-128, 2026-09-23). Same AllowAnonymous rationale as
+    // the rest of this controller. Always 200 with the same body regardless of whether the email
+    // is registered — see AuthService.ForgotPasswordAsync's own comment on why.
+    [HttpPost("forgot-password", Name = "Forgot Password")]
+    public async Task<ActionResult<ForgotPasswordResponseDto>> ForgotPassword([FromBody] ForgotPasswordDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _authService.ForgotPasswordAsync(dto, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
+
+    // Forgot-password recovery, step 2 (MAYD-129/130, 2026-09-23). Deliberately a different route
+    // name/shape than 'reset-password' above — that one requires the CURRENT password (forced-
+    // first-login / the existing "تغيير كلمة المرور" flow); this one is gated by the emailed token
+    // instead, with no current password involved at all.
+    [HttpPost("reset-password-with-token", Name = "Reset Password With Token")]
+    public async Task<ActionResult<ResetPasswordWithTokenResponseDto>> ResetPasswordWithToken([FromBody] ResetPasswordWithTokenDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _authService.ResetPasswordWithTokenAsync(dto, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
+
     // Entity onboarding Stage 1 (2026-09-22): public production-company self-registration — same
     // AllowAnonymous rationale as the rest of this controller, since there's no session at all yet
     // (not even a user to log in as until this call succeeds). Instant activation (confirmed

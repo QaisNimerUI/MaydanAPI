@@ -13,6 +13,7 @@ public interface IUnitOfWork
     IProductionCompanyRepository ProductionCompanies { get; }
     IProjectRepository Projects { get; }
     IWorkerRepository Workers { get; }
+    IPasswordResetTokenRepository PasswordResetTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

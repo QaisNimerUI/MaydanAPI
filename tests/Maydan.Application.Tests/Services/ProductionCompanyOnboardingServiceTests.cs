@@ -259,6 +259,7 @@ public class ProductionCompanyOnboardingServiceTests
         public IAssociationRepository Associations => throw new NotSupportedException();
         public IProjectRepository Projects => throw new NotSupportedException();
         public IWorkerRepository Workers => throw new NotSupportedException();
+        public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
 

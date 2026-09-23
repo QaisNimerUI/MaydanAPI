@@ -10,6 +10,21 @@ public class LoginRequestDto
 
 public record ResetPasswordDto(string Email, string CurrentPassword, string NewPassword);
 
+// Forgot-password recovery (MAYD-128/129/130, 2026-09-23): deliberately separate from
+// ResetPasswordDto above — that flow requires knowing the CURRENT password (forced-first-login /
+// the existing "تغيير كلمة المرور" link); this one is the genuine "I don't know my password at
+// all" recovery path, gated by proving control of the account's email instead.
+public record ForgotPasswordDto(string Email);
+
+// Always the same message whether or not the email is registered — see
+// AuthService.ForgotPasswordAsync's own comment on why (email-enumeration safety, this story's own
+// requirement).
+public record ForgotPasswordResponseDto(string Message);
+
+public record ResetPasswordWithTokenDto(string Token, string NewPassword, string ConfirmPassword);
+
+public record ResetPasswordWithTokenResponseDto(string Message);
+
 public record LoginResponseDto(
     bool IsAuthenticated,
     bool MustResetPassword,

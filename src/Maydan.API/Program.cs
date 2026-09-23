@@ -3,10 +3,12 @@ using FluentValidation;
 using Maydan.API.Security;
 using Maydan.Application.Interfaces;
 using Maydan.Application.Services;
+using Maydan.Infrastructure.Email;
 using Maydan.Infrastructure.Persistence;
 using Maydan.Infrastructure.Repositories;
 using Maydan.Infrastructure.Security;
 using Maydan.Infrastructure.Storage;
+using Maydan.Infrastructure.Web;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -47,6 +49,11 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IProductionCompanyOnboardingService, ProductionCompanyOnboardingService>();
 builder.Services.AddScoped<IEntityOnboardingService, EntityOnboardingService>();
+builder.Services.AddScoped<IFrontendLinkBuilder, FrontendLinkBuilder>();
+// Forgot-password recovery (2026-09-23): TEMPORARY — no real email provider is chosen yet. See
+// LoggingEmailSender's own comment; swap this one registration for a real implementation once
+// Yousef picks a provider.
+builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
