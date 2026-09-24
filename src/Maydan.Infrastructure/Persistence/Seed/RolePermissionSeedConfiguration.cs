@@ -89,9 +89,16 @@ namespace Maydan.Infrastructure.Persistence.Seed
             //   allPermissionIds respectively).
             // - Payments: View for all 4 roles; Manage for Bayt-AlUrdon + ProductionHouse only
             //   (the company paying) — Association/ASEZA get View only.
+            // MAYD-1 real fix (2026-09-24, product-owner-confirmed): CreateUsers added — ASEZA can
+            // create users within its OWN entity (confirmed real requirement, separate from its
+            // cross-entity VIEW-only oversight over Associations/ProductionHouse, which stays
+            // exactly as it was — no create/edit grant added for those). Before this, ASEZA held
+            // ZERO Create-Users-equivalent permission (confirmed live during the MAYD-36 sweep), so
+            // /users/new 403'd via the frontend's own roleGuard (['Create Users', 'Manage Users'])
+            // even though nothing else about ASEZA's own-entity user creation was ever broken.
             var asezaPermissions = new[]
             {
-                ViewUsers, ViewAssociations, ManageAssociations, ViewAssociationUsers,
+                ViewUsers, CreateUsers, ViewAssociations, ManageAssociations, ViewAssociationUsers,
                 ViewProductionCompanies, ViewProductionHouses, ManageProductionHouses,
                 ViewWorkers, ViewProjects, ManageServices,
                 ViewGroups, ManageGroups,

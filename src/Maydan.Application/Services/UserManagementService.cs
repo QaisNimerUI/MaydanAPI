@@ -86,8 +86,16 @@ public class UserManagementService : IUserManagementService
         await EnsurePermissionsExistAsync(permissionIds, cancellationToken);
         EnsurePermissionsAllowedForRole(role, permissionIds);
 
+        // Same role as the creator (the only case every role but Bayt-AlUrdon can ever reach, per
+        // EnsureSameEntityCreation above) keeps the exact prior behavior: the new user belongs to the
+        // creator's own entity. Only Bayt-AlUrdon creating a DIFFERENT role reaches the resolved
+        // branch — see ResolveEntityForRole's own comment.
+        var (targetEntityType, targetEntityId) = role.RoleId == currentUser.RoleId
+            ? (currentUser.EntityType, currentUser.EntityId)
+            : ResolveEntityForRole(role.RoleId);
+
         var groupIds = NormalizeIds(dto.GroupIds);
-        var groups = await EnsureGroupsInEntityAsync(groupIds, currentUser, cancellationToken);
+        var groups = await EnsureGroupsInEntityAsync(groupIds, targetEntityType, targetEntityId, cancellationToken);
 
         var user = new User
         {
@@ -101,8 +109,8 @@ public class UserManagementService : IUserManagementService
             MustResetPassword = true,
             IsActive = true,
             RoleId = role.RoleId,
-            EntityType = currentUser.EntityType,
-            EntityId = currentUser.EntityId
+            EntityType = targetEntityType,
+            EntityId = targetEntityId
         };
 
         foreach (var permissionId in permissionIds)
@@ -321,7 +329,7 @@ public class UserManagementService : IUserManagementService
         var user = await GetScopedUserAsync(userId, currentUser, cancellationToken);
 
         var groupIds = NormalizeIds(dto.GroupIds);
-        await EnsureGroupsInEntityAsync(groupIds, currentUser, cancellationToken);
+        await EnsureGroupsInEntityAsync(groupIds, currentUser.EntityType, currentUser.EntityId, cancellationToken);
 
         SyncUserGroups(user, groupIds);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -352,6 +360,31 @@ public class UserManagementService : IUserManagementService
     // Matches PermissionSeedConfiguration.cs ids 1/3.
     private const int ViewUsersPermissionId = 1;
     private const int ManageUsersPermissionId = 3;
+
+    // Matches RoleSeedConfiguration.cs / RolePermissionSeedConfiguration.cs's own RoleId constants.
+    private const int BaytAlUrdonRoleId = 1;
+    private const int AsezaRoleId = 2;
+    private const int ProductionHouseRoleId = 3;
+    private const int AssociationRoleId = 4;
+
+    // MAYD-1 real fix (2026-09-24): RoleId and EntityType are two separate enumerations in this
+    // codebase (RoleSeedConfiguration's ids don't line up with EntityType's own numeric values), and
+    // until now nothing needed to convert one into the other — every created user's EntityType/
+    // EntityId simply came from the caller's own session. Bayt-AlUrdon creating a user under a role
+    // that ISN'T its own now needs this mapping for real. EntityId is always 1 for the three
+    // single-instance-so-far entity types (Aseza/ProductionCompany/Association) — the same
+    // placeholder convention every seeded test account for those entities already uses in this Dev
+    // DB (see UserSeedConfiguration.cs's own comments: zero real Association/ProductionCompany rows
+    // exist yet, a separate already-flagged gap), since there is no real entity-instance picker (or
+    // data to pick from) for this ticket to build.
+    private static (EntityType EntityType, int EntityId) ResolveEntityForRole(int roleId) => roleId switch
+    {
+        BaytAlUrdonRoleId => (EntityType.BaytAlUrdon, 1),
+        AsezaRoleId => (EntityType.Aseza, 1),
+        ProductionHouseRoleId => (EntityType.ProductionCompany, 1),
+        AssociationRoleId => (EntityType.Association, 1),
+        _ => throw new KeyNotFoundException("Role was not found.")
+    };
 
     // MAYD-20: Business Rule (MAYD-1) — only Bayt-AlUrdon and ASEZA may view an entity other than
     // their own; every other role is rejected for anything but its own entity. Requesting no
@@ -513,14 +546,19 @@ public class UserManagementService : IUserManagementService
         }
     }
 
-    private async Task<List<Group>> EnsureGroupsInEntityAsync(List<int> groupIds, User currentUser, CancellationToken cancellationToken)
+    // MAYD-1 real fix (2026-09-24): now takes an explicit target entity rather than a User, so
+    // CreateUserAsync can scope group assignment to the NEW user's own target entity (which, for a
+    // Bayt-AlUrdon cross-entity create, differs from the caller's) while UpdateGroupsAsync keeps
+    // passing its own currentUser.EntityType/EntityId — same values, same behavior as before this
+    // refactor, unchanged.
+    private async Task<List<Group>> EnsureGroupsInEntityAsync(List<int> groupIds, EntityType entityType, int entityId, CancellationToken cancellationToken)
     {
         if (groupIds.Count == 0)
         {
             return new List<Group>();
         }
 
-        var groups = await _unitOfWork.Groups.GetByIdsInEntityAsync(groupIds, currentUser.EntityType, currentUser.EntityId, cancellationToken);
+        var groups = await _unitOfWork.Groups.GetByIdsInEntityAsync(groupIds, entityType, entityId, cancellationToken);
         if (groups.Count != groupIds.Count)
         {
             throw new UnauthorizedAccessException("One or more groups were not found in the current entity.");
@@ -545,24 +583,34 @@ public class UserManagementService : IUserManagementService
         return users;
     }
 
-    // Audit follow-up: CreateUserAsync below always stamps the new user's EntityType/EntityId from
-    // the CALLER (currentUser), never from dto.RoleId — correct only when the new account belongs
-    // to the same role (and therefore same entity) as the creator, which is the only case the real
-    // UI ever sends. UserCreateWizardComponent auto-derives RoleId from the creator's own session
-    // and never offers a role/entity picker at all, per its own comment on the confirmed
-    // "no cross-entity user creation" business rule. This guard turns a caller that bypasses the UI
-    // and requests a different RoleId (a raw API call, Postman, a future client bug) into an
-    // explicit rejection instead of the silent EntityType/EntityId mis-scoping that shipped before
-    // this check existed. Deliberately does NOT touch the EntityType/EntityId assignment itself —
-    // that logic is correct once this check guarantees same-role creation. Does not solve the
-    // separate, larger gap of onboarding a brand-new entity's first user of a *different* role —
-    // see maydan-entity-onboarding-gap.md.
+    // MAYD-1 real fix (2026-09-24, product-owner-confirmed): Bayt-AlUrdon (Super Admin, RoleId 1) is
+    // the one deliberate exception to the "same role as creator" rule below — its confirmed authority
+    // is view + CREATE across every entity, not edit (UpdateDirectPermissionsAsync/UpdateGroupsAsync
+    // are untouched by this fix and stay strict same-entity for every role, Bayt-AlUrdon included —
+    // see those methods' own code, unchanged). ASEZA is NOT given this exception: its role is
+    // oversight/view-only over Associations and ProductionHouse (already real, see
+    // GetViewableUserAsync/ResolveTargetEntity), plus the ability to create users within its OWN
+    // entity only once granted the real CreateUsers permission (RolePermissionSeedConfiguration.cs) —
+    // it still creates same-role-as-itself like everyone but Bayt-AlUrdon.
+    //
+    // Superseded, no longer applies as of this fix: the "audit follow-up" comment this replaced
+    // (5bc0ad0) rejected EVERY cross-role create outright specifically because CreateUserAsync's
+    // EntityType/EntityId assignment always came from the caller, which would have silently
+    // mis-scoped a Bayt-AlUrdon-created Association user as EntityType.BaytAlUrdon. That assignment
+    // is fixed alongside this check (see CreateUserAsync's own comment) — the two changes are a pair.
     private static void EnsureSameEntityCreation(User currentUser, int requestedRoleId)
     {
-        if (requestedRoleId != currentUser.RoleId)
+        if (requestedRoleId == currentUser.RoleId)
         {
-            throw new InvalidOperationException("Cannot create a user with a different role than the current user's own role.");
+            return;
         }
+
+        if (currentUser.RoleId == BaytAlUrdonRoleId)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Cannot create a user with a different role than the current user's own role.");
     }
 
     private static void ValidateUserPayload(CreateEntityUserDto dto)

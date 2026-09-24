@@ -10,8 +10,18 @@ namespace Maydan.Application.Tests.Services;
 // verification): CreateUserAsync always stamps the new user's EntityType/EntityId from the
 // CALLER, never from dto.RoleId. That's correct for same-role creation (the only case the real UI
 // ever sends) but was silently wrong for a cross-role call. These tests prove
-// UserManagementService.EnsureSameEntityCreation() now rejects the cross-role case instead of
-// silently mis-scoping it, while leaving the same-role, self-service path untouched.
+// UserManagementService.EnsureSameEntityCreation() rejects the cross-role case for everyone EXCEPT
+// Bayt-AlUrdon, while leaving the same-role, self-service path untouched.
+//
+// MAYD-1 real fix (2026-09-24, product-owner-confirmed): Bayt-AlUrdon's confirmed authority is
+// view + CREATE across every entity. The old "CreateUserAsync_DifferentRoleThanCreator_..." test
+// below used Bayt-AlUrdon as the CALLER and asserted a throw — that assumption is no longer true
+// and the test is rewritten (as
+// CreateUserAsync_NonBaytAlUrdonDifferentRoleThanCreator_ThrowsAndNeverCreatesTheUser) to use a
+// non-Bayt-AlUrdon caller instead, which is still correctly rejected. New tests below cover the
+// Bayt-AlUrdon exception itself, including that the created user's EntityType/EntityId resolve to
+// the TARGET role's entity (not the caller's Bayt-AlUrdon entity), and that group-id validation
+// during that create is scoped to the target entity too (EnsureGroupsInEntityAsync's own fix).
 public class UserManagementServiceTests
 {
     [Fact]
@@ -54,23 +64,23 @@ public class UserManagementServiceTests
     }
 
     [Fact]
-    public async Task CreateUserAsync_DifferentRoleThanCreator_ThrowsAndNeverCreatesTheUser()
+    public async Task CreateUserAsync_NonBaytAlUrdonDifferentRoleThanCreator_ThrowsAndNeverCreatesTheUser()
     {
-        var baytAlUrdonRole = new Role { RoleId = 1, RoleNameEn = "Bayt-AlUrdon", RoleNameAr = "بيت الأردن" };
+        var asezaRole = new Role { RoleId = 2, RoleNameEn = "ASEZA", RoleNameAr = "أسيزا" };
         var currentUser = new User
         {
             UserId = 1,
-            RoleId = baytAlUrdonRole.RoleId,
-            Role = baytAlUrdonRole,
-            EntityType = EntityType.BaytAlUrdon,
+            RoleId = asezaRole.RoleId,
+            Role = asezaRole,
+            EntityType = EntityType.Aseza,
             EntityId = 1,
             IsActive = true
         };
 
-        var userRepository = new FakeUserRepository(currentUser, baytAlUrdonRole);
+        var userRepository = new FakeUserRepository(currentUser, asezaRole);
         // The role catalog lookup is never reached — EnsureSameEntityCreation rejects before it —
         // so the repository only needs to know the creator's own role.
-        var unitOfWork = new FakeUnitOfWork(userRepository, new FakeRoleRepository(baytAlUrdonRole));
+        var unitOfWork = new FakeUnitOfWork(userRepository, new FakeRoleRepository(asezaRole));
         var service = new UserManagementService(unitOfWork, new FakePasswordHasher());
 
         var dto = new CreateEntityUserDto
@@ -82,7 +92,7 @@ public class UserManagementServiceTests
             Email = "cross.role@example.org",
             PhoneNumber = "+962700000001",
             InitialPassword = "P@ssw0rd!",
-            RoleId = 4 // Association — different from the caller's own role (1, Bayt-AlUrdon)
+            RoleId = 4 // Association — different from the caller's own role (2, ASEZA)
         };
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -92,15 +102,103 @@ public class UserManagementServiceTests
         Assert.Null(userRepository.AddedUser);
     }
 
+    [Theory]
+    [InlineData(4, EntityType.Association)] // Association
+    [InlineData(3, EntityType.ProductionCompany)] // ProductionHouse
+    [InlineData(2, EntityType.Aseza)] // ASEZA
+    public async Task CreateUserAsync_BaytAlUrdonCreatingADifferentRole_SucceedsScopedToTheTargetRolesEntity(int targetRoleId, EntityType expectedEntityType)
+    {
+        var baytAlUrdonRole = new Role { RoleId = 1, RoleNameEn = "Bayt-AlUrdon", RoleNameAr = "بيت الأردن" };
+        var targetRole = new Role { RoleId = targetRoleId, RoleNameEn = "Target", RoleNameAr = "هدف" };
+        var currentUser = new User
+        {
+            UserId = 1,
+            RoleId = baytAlUrdonRole.RoleId,
+            Role = baytAlUrdonRole,
+            EntityType = EntityType.BaytAlUrdon,
+            EntityId = 1,
+            IsActive = true
+        };
+
+        var userRepository = new FakeUserRepository(currentUser, targetRole);
+        var unitOfWork = new FakeUnitOfWork(userRepository, new FakeRoleRepository(baytAlUrdonRole, targetRole));
+        var service = new UserManagementService(unitOfWork, new FakePasswordHasher());
+
+        var dto = new CreateEntityUserDto
+        {
+            FirstNameEn = "Cross",
+            LastNameEn = "Entity",
+            FirstNameAr = "عبر",
+            LastNameAr = "كيان",
+            Email = $"cross.entity.{targetRoleId}@example.org",
+            PhoneNumber = "+962700000002",
+            InitialPassword = "P@ssw0rd!",
+            RoleId = targetRoleId
+        };
+
+        var result = await service.CreateUserAsync(currentUser.UserId, dto);
+
+        // Never the CALLER's own Bayt-AlUrdon entity — the resolved TARGET role's entity instead.
+        Assert.Equal(expectedEntityType, result.EntityType);
+        Assert.NotEqual(EntityType.BaytAlUrdon, result.EntityType);
+        Assert.Equal(1, result.EntityId); // the established single-placeholder-entity convention
+        Assert.NotNull(userRepository.AddedUser);
+        Assert.Equal(expectedEntityType, userRepository.AddedUser!.EntityType);
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_BaytAlUrdonCreatingADifferentRole_ScopesGroupIdValidationToTheTargetEntityNotTheCallers()
+    {
+        var baytAlUrdonRole = new Role { RoleId = 1, RoleNameEn = "Bayt-AlUrdon", RoleNameAr = "بيت الأردن" };
+        var associationRole = new Role { RoleId = 4, RoleNameEn = "Association", RoleNameAr = "الجمعية" };
+        var currentUser = new User
+        {
+            UserId = 1,
+            RoleId = baytAlUrdonRole.RoleId,
+            Role = baytAlUrdonRole,
+            EntityType = EntityType.BaytAlUrdon,
+            EntityId = 1,
+            IsActive = true
+        };
+
+        var group = new Group { GroupId = 5, GroupNameEn = "g", GroupNameAr = "g", EntityType = EntityType.Association, EntityId = 1, IsActive = true };
+        var userRepository = new FakeUserRepository(currentUser, associationRole, groupsById: new Dictionary<int, Group> { [5] = group });
+        var groupRepository = new FakeGroupRepository(group);
+        var unitOfWork = new FakeUnitOfWork(userRepository, new FakeRoleRepository(baytAlUrdonRole, associationRole), groupRepository);
+        var service = new UserManagementService(unitOfWork, new FakePasswordHasher());
+
+        var dto = new CreateEntityUserDto
+        {
+            FirstNameEn = "Cross",
+            LastNameEn = "Entity",
+            FirstNameAr = "عبر",
+            LastNameAr = "كيان",
+            Email = "cross.entity.groups@example.org",
+            PhoneNumber = "+962700000003",
+            InitialPassword = "P@ssw0rd!",
+            RoleId = associationRole.RoleId,
+            GroupIds = new List<int> { 5 }
+        };
+
+        await service.CreateUserAsync(currentUser.UserId, dto);
+
+        // Proves EnsureGroupsInEntityAsync was queried against the TARGET (Association) entity —
+        // not EntityType.BaytAlUrdon/1, the caller's own entity — the exact bug this fix closes.
+        Assert.Equal(EntityType.Association, groupRepository.LastQueriedEntityType);
+        Assert.Equal(1, groupRepository.LastQueriedEntityId);
+    }
+
     private sealed class FakeUserRepository : IUserRepository
     {
         private readonly Dictionary<int, User> _usersById;
         private readonly Role _roleForNewUsers;
+        private readonly Dictionary<int, Group>? _groupsById;
 
-        public FakeUserRepository(User currentUser, Role roleForNewUsers)
+        public FakeUserRepository(User currentUser, Role roleForNewUsers, Dictionary<int, Group>? groupsById = null)
         {
             _usersById = new Dictionary<int, User> { [currentUser.UserId] = currentUser };
             _roleForNewUsers = roleForNewUsers;
+            _groupsById = groupsById;
         }
 
         public User? AddedUser { get; private set; }
@@ -115,6 +213,23 @@ public class UserManagementServiceTests
         {
             user.UserId = 100;
             user.Role = _roleForNewUsers;
+
+            // Real EF Core performs Group navigation fixup automatically once both entities are
+            // tracked in the same DbContext (CreateUserAsync itself only sets UserGroup.GroupId, not
+            // .Group) — this plain in-memory fake has no change tracker, so it's done by hand here,
+            // matching real runtime behavior, only for MapUserDetails (called right after AddAsync)
+            // to have a non-null Group to read.
+            if (_groupsById is not null)
+            {
+                foreach (var userGroup in user.UserGroups)
+                {
+                    if (_groupsById.TryGetValue(userGroup.GroupId, out var group))
+                    {
+                        userGroup.Group = group;
+                    }
+                }
+            }
+
             AddedUser = user;
             _usersById[user.UserId] = user;
             return Task.CompletedTask;
@@ -133,6 +248,31 @@ public class UserManagementServiceTests
         public Task<User?> GetWithPermissionsAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<User>> GetByIdsInEntityAsync(IEnumerable<int> userIds, EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public void Remove(User user) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeGroupRepository : IGroupRepository
+    {
+        private readonly Dictionary<int, Group> _groupsById;
+
+        public FakeGroupRepository(params Group[] groups) => _groupsById = groups.ToDictionary(g => g.GroupId);
+
+        public EntityType? LastQueriedEntityType { get; private set; }
+        public int? LastQueriedEntityId { get; private set; }
+
+        public Task<List<Group>> GetByIdsInEntityAsync(IEnumerable<int> groupIds, EntityType entityType, int entityId, CancellationToken cancellationToken = default)
+        {
+            LastQueriedEntityType = entityType;
+            LastQueriedEntityId = entityId;
+            return Task.FromResult(groupIds.Where(id => _groupsById.ContainsKey(id)).Select(id => _groupsById[id]).ToList());
+        }
+
+        public Task<Group?> GetByIdAsync(int groupId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Group?> GetDetailsAsync(int groupId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<Group>> GetAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<Group>> GetByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> NameExistsInEntityAsync(EntityType entityType, int entityId, string groupNameEn, string groupNameAr, int? excludedGroupId = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task AddAsync(Group group, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Remove(Group group) => throw new NotSupportedException();
     }
 
     private sealed class FakeRoleRepository : IRoleRepository
@@ -158,21 +298,23 @@ public class UserManagementServiceTests
         public bool VerifyPassword(string password, string passwordHash) => passwordHash == $"hashed:{password}";
     }
 
-    // Only Users/Roles are backed by a working fake — CreateUserAsync never reaches the other
-    // repositories in either test above (both DTOs use empty PermissionIds/GroupIds, so
-    // EnsurePermissionsExistAsync/EnsureGroupsInEntityAsync return before touching them).
+    // Users/Roles are always backed by a working fake; Groups only when a test explicitly passes
+    // one (most tests use empty GroupIds, so EnsureGroupsInEntityAsync returns before touching it).
     private sealed class FakeUnitOfWork : IUnitOfWork
     {
-        public FakeUnitOfWork(IUserRepository users, IRoleRepository roles)
+        private readonly IGroupRepository? _groups;
+
+        public FakeUnitOfWork(IUserRepository users, IRoleRepository roles, IGroupRepository? groups = null)
         {
             Users = users;
             Roles = roles;
+            _groups = groups;
         }
 
         public IUserRepository Users { get; }
         public IRoleRepository Roles { get; }
         public IPermissionRepository Permissions => throw new NotSupportedException();
-        public IGroupRepository Groups => throw new NotSupportedException();
+        public IGroupRepository Groups => _groups ?? throw new NotSupportedException();
         public IProjectTypeRepository ProjectTypes => throw new NotSupportedException();
         public ICountryRepository Countries => throw new NotSupportedException();
         public ICityRepository Cities => throw new NotSupportedException();
