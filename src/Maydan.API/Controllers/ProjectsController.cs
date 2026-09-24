@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Maydan.API.Controllers;
 
 [Route("api/[controller]")]
-[Authorize]
+
 public class ProjectsController : ApiControllerBase
 {
     private readonly IProjectService _projectService;
