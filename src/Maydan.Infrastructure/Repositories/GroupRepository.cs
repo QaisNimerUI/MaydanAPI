@@ -33,9 +33,16 @@ public class GroupRepository : IGroupRepository
     public Task<List<Group>> GetAllAsync(CancellationToken cancellationToken = default) =>
         _context.Groups.ToListAsync(cancellationToken);
 
+    // MAYD-31: ThenInclude(Permission) added — the list card needs each permission's real name to
+    // render a chip preview (see UserManagementService.MapGroupSummary), not just the raw
+    // GroupPermission count. Same single query either way (Permission is a small lookup table, one
+    // more JOIN) — NOT a new N+1: the original reasoning for count-only ("avoid a details call per
+    // card") was correct to avoid a PER-GROUP round trip, but the permission names were always
+    // reachable in this same list query, just never selected.
     public Task<List<Group>> GetByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) =>
         _context.Groups
             .Include(g => g.GroupPermissions)
+                .ThenInclude(gp => gp.Permission)
             .Include(g => g.UserGroups)
             .Where(g => g.EntityType == entityType && g.EntityId == entityId)
             .OrderBy(g => g.GroupNameEn)

@@ -8,12 +8,18 @@ public record PermissionDto(
     string PermissionNameAr,
     string Module);
 
+// MAYD-31: PermissionsPreview added — the real ticket asks for "a preview of permission chips" on
+// each card, not just a count. Capped at PermissionSummaryPreviewSize (4, matching the old mock UI's
+// "4 chips + N more" pattern the frontend's own dormant `groupsList.more` i18n key was already
+// prepared for) — see UserManagementService.MapGroupSummary for how it's populated in the same
+// query as PermissionCount, not a second per-group fetch.
 public record GroupSummaryDto(
     int GroupId,
     string GroupNameEn,
     string GroupNameAr,
     int PermissionCount,
-    int UserCount);
+    int UserCount,
+    List<PermissionDto> PermissionsPreview);
 
 public record GroupDetailsDto(
     int GroupId,

@@ -128,6 +128,47 @@ namespace Maydan.Infrastructure.Persistence.Seed
                     CreatedAt = seedDate,
                     UpdatedAt = seedDate,
                     IsDeleted = false
+                },
+                new User
+                {
+                    // MAYD-36 (2026-09-24): the entity-scoping verification pass's own explicit gap —
+                    // no Production House test account existed anywhere in this project, so this real
+                    // role (RoleId 3 / EntityType.ProductionCompany) had never actually been
+                    // live-tested across Users/Groups/Permissions, only reasoned about from the other
+                    // three roles' behavior. Not UserId 1002 — that id is already occupied by the
+                    // app-created `wizard-test@example.org` orphan (not a HasData row), so this
+                    // continues the UserId-1000-range convention at the next free id.
+                    UserId = 1003,
+
+                    FirstNameEn = "Production",
+                    LastNameEn = "Tester",
+
+                    FirstNameAr = "شركة",
+                    LastNameAr = "اختبار",
+
+                    PhoneNumber = "+962770000026",
+                    Email = "production-tester@example.org",
+
+                    // Test credentials (2026-09-24). Same real IPasswordHasher, password: ProdHouse@12345.
+                    PasswordHash = "PBKDF2-SHA256.100000.7DqYchDowXom9IfwCgW+4g==.d41vmNOYVi3nthYMOioczS+W871M/cTKq6Ps58ISAcg=",
+
+                    RoleId = 3,
+
+                    EntityType = EntityType.ProductionCompany,
+
+                    // Same placeholder convention as Association's EntityId = 1 above: EntityType.
+                    // ProductionCompany IS meant to be a real FK to ProductionCompany.Id (User.cs's
+                    // own comment), but the real ProductionCompanies table has zero rows in this Dev
+                    // DB (confirmed via a direct query before writing this seed) — no seeded company
+                    // exists to reference yet, same gap noted for Association.
+                    EntityId = 1,
+
+                    MustResetPassword = false,
+                    IsActive = true,
+
+                    CreatedAt = seedDate,
+                    UpdatedAt = seedDate,
+                    IsDeleted = false
                 }
             );
         }

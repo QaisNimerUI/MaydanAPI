@@ -223,13 +223,27 @@ public class EntityOnboardingService : IEntityOnboardingService
             effectivePermissions);
     }
 
-    private static GroupSummaryDto MapGroupSummary(Group group) =>
-        new(
+    // MAYD-31: matches UserManagementService's own MapGroupSummary shape — the newly onboarded
+    // admin this response describes never has any groups yet (see this method's own caller), so
+    // group.GroupPermissions is always empty here in practice; kept consistent with the real DTO
+    // shape anyway rather than special-casing an empty preview.
+    private static GroupSummaryDto MapGroupSummary(Group group)
+    {
+        var activePermissions = group.GroupPermissions
+            .Where(gp => gp.IsActive && gp.Permission.IsActive)
+            .Select(gp => gp.Permission)
+            .OrderBy(p => p.Module)
+            .ThenBy(p => p.PermissionNameEn)
+            .ToList();
+
+        return new(
             group.GroupId,
             group.GroupNameEn,
             group.GroupNameAr,
-            group.GroupPermissions.Count(gp => gp.IsActive),
-            group.UserGroups.Count);
+            activePermissions.Count,
+            group.UserGroups.Count,
+            activePermissions.Take(4).Select(MapPermission).ToList());
+    }
 
     private static PermissionDto MapPermission(Permission permission) =>
         new(

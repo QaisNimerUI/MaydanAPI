@@ -62,7 +62,7 @@ public class UserManagementService : IUserManagementService
     public async Task<UserDetailsDto> GetUserDetailsAsync(int currentUserId, int userId, CancellationToken cancellationToken = default)
     {
         var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
-        var user = await GetScopedUserAsync(userId, currentUser, cancellationToken);
+        var user = await GetViewableUserAsync(userId, currentUser, cancellationToken);
 
         return MapUserDetails(user);
     }
@@ -289,6 +289,19 @@ public class UserManagementService : IUserManagementService
 
     public async Task<UserDetailsDto> UpdateDirectPermissionsAsync(int currentUserId, int userId, UpdateUserPermissionsDto dto, CancellationToken cancellationToken = default)
     {
+        // MAYD-34 verification gap fix (2026-09-24): UserManagementModule.md Phase 5.4 ("Prevent
+        // Self Permission Modification") is a real, documented business rule — a User cannot modify
+        // their own permissions even while holding AssignPermissions/Manage Users, and this must be
+        // rejected here, not just hidden behind a disabled button (same "check the service layer,
+        // not just the route guard" precedent as GetScopedUserAsync's entity check below). No
+        // equivalent rule exists for groups (Phase 5.4 is titled "Self PERMISSION Modification" and
+        // Part 10's own test checklist only lists it for permissions) — UpdateGroupsAsync is
+        // deliberately left untouched.
+        if (currentUserId == userId)
+        {
+            throw new UnauthorizedAccessException("You cannot modify your own permissions.");
+        }
+
         var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
         var user = await GetScopedUserAsync(userId, currentUser, cancellationToken);
 
@@ -358,9 +371,8 @@ public class UserManagementService : IUserManagementService
         }
 
         var isOwnEntity = entityType == currentUser.EntityType && entityId == currentUser.EntityId;
-        var canViewOtherEntities = currentUser.EntityType is EntityType.BaytAlUrdon or EntityType.Aseza;
 
-        if (!isOwnEntity && !canViewOtherEntities)
+        if (!isOwnEntity && !CanViewOtherEntities(currentUser))
         {
             throw new UnauthorizedAccessException("Cannot view users outside your own entity.");
         }
@@ -390,6 +402,14 @@ public class UserManagementService : IUserManagementService
         return rolePermissionIds.Concat(directPermissionIds).Concat(groupPermissionIds).ToHashSet();
     }
 
+    // MAYD-36 verification gap fix (2026-09-24): strictly same-entity, no override, for the two
+    // WRITE paths (UpdateDirectPermissionsAsync/UpdateGroupsAsync) — deliberately NOT given the
+    // Bayt-AlUrdon/ASEZA cross-entity override GetViewableUserAsync below has. Every real comment on
+    // this Business Rule (MAYD-1) found in this codebase — GetUsersPagedAsync's own header comment,
+    // ResolveTargetEntity below — only ever describes the override as a VIEW capability ("ASEZA's is
+    // explicitly read-only by the BR"); nothing documents a cross-entity MANAGE/edit capability for
+    // any role. Keeping writes strict-same-entity for everyone is the minimal, safest reading of the
+    // actual documented rule — it doesn't invent a broader "edit anywhere" capability nobody asked for.
     private async Task<User> GetScopedUserAsync(int userId, User currentUser, CancellationToken cancellationToken)
     {
         var user = await _unitOfWork.Users.GetDetailsAsync(userId, cancellationToken)
@@ -402,6 +422,38 @@ public class UserManagementService : IUserManagementService
 
         return user;
     }
+
+    // MAYD-36 verification gap fix (2026-09-24): a real scoping inconsistency this systematic sweep
+    // caught that the piecemeal per-ticket passes (MAYD-20, MAYD-25) each missed by only testing
+    // their own endpoint — GetUsersPagedAsync (the Users List) already lets Bayt-AlUrdon/ASEZA view a
+    // DIFFERENT entity's users via entityType/entityId (see ResolveTargetEntity below), but
+    // GetUserDetailsAsync (a single user's own Details page — the page that list's own rows link to)
+    // used to go through the strict same-entity-only GetScopedUserAsync above, with no such override
+    // at all. Confirmed live: as Ghaith, GET /api/users?entityType=ProductionCompany&entityId=1
+    // returned 200 with the real Production House user, but GET /api/users/{thatUserId}/details on
+    // that exact user 403'd — the List page could show a row you then couldn't click into. This is
+    // the read counterpart of ResolveTargetEntity, used ONLY by GetUserDetailsAsync (and, through it,
+    // GetEffectivePermissionsAsync) — never by the two write methods above, which keep the strict
+    // check on purpose (see GetScopedUserAsync's own comment on why).
+    private async Task<User> GetViewableUserAsync(int userId, User currentUser, CancellationToken cancellationToken)
+    {
+        var user = await _unitOfWork.Users.GetDetailsAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User was not found.");
+
+        var isOwnEntity = user.EntityType == currentUser.EntityType && user.EntityId == currentUser.EntityId;
+        if (!isOwnEntity && !CanViewOtherEntities(currentUser))
+        {
+            throw new UnauthorizedAccessException("Cannot view users outside your own entity.");
+        }
+
+        return user;
+    }
+
+    // Shared by GetViewableUserAsync above and ResolveTargetEntity below — extracted so both real
+    // cross-entity VIEW paths (single-user Details and the paginated List) apply the exact same
+    // Business Rule (MAYD-1) check rather than two copies that could silently drift apart.
+    private static bool CanViewOtherEntities(User currentUser) =>
+        currentUser.EntityType is EntityType.BaytAlUrdon or EntityType.Aseza;
 
     private async Task<Group> GetScopedGroupAsync(int groupId, User currentUser, CancellationToken cancellationToken)
     {
@@ -683,13 +735,28 @@ public class UserManagementService : IUserManagementService
             effectivePermissions);
     }
 
-    private static GroupSummaryDto MapGroupSummary(Group group) =>
-        new(
+    // MAYD-31: matches GetAvailablePermissionsAsync's own Module-then-name ordering, so the same
+    // permission always appears first in both this preview and the full catalog page — a
+    // deterministic, real ordering rather than whatever order EF happened to materialize rows in.
+    private const int GroupPermissionPreviewSize = 4;
+
+    private static GroupSummaryDto MapGroupSummary(Group group)
+    {
+        var activePermissions = group.GroupPermissions
+            .Where(gp => gp.IsActive && gp.Permission.IsActive)
+            .Select(gp => gp.Permission)
+            .OrderBy(p => p.Module)
+            .ThenBy(p => p.PermissionNameEn)
+            .ToList();
+
+        return new(
             group.GroupId,
             group.GroupNameEn,
             group.GroupNameAr,
-            group.GroupPermissions.Count(gp => gp.IsActive),
-            group.UserGroups.Count);
+            activePermissions.Count,
+            group.UserGroups.Count,
+            activePermissions.Take(GroupPermissionPreviewSize).Select(MapPermission).ToList());
+    }
 
     private static GroupDetailsDto MapGroupDetails(Group group) =>
         new(
