@@ -38,6 +38,15 @@ public record UserSummaryDto(
     bool MustResetPassword,
     bool IsActive);
 
+// MAYD-20: real paginated list contract — matches the BRD's own explicit response shape
+// (`{ items, totalCount, page, pageSize }`, see Claude outputs/maydan-backend-requirements.md
+// section 1.2 in the frontend repo) exactly, camelCase over the wire same as every other DTO here.
+public record PagedUsersDto(
+    List<UserSummaryDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
+
 public record UserDetailsDto(
     int UserId,
     string FirstNameEn,

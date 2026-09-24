@@ -99,8 +99,17 @@ namespace Maydan.Infrastructure.Persistence.Seed
                 ViewPayments
             };
 
+            // MAYD-20 (2026-09-24): ViewUsers added to both arrays below — previously granted to
+            // Bayt-AlUrdon/ASEZA only. The real Business Rule (MAYD-1) explicitly requires
+            // "{Entity} Admin (Association, Production House) can view users only within their own
+            // entity", which is unreachable without this grant (the endpoint 403s otherwise, not
+            // "sees only its own entity" — there's a real difference). Flagged rather than silent:
+            // the final Roles/Permissions design is explicitly MAYD-19's call (To Do, a different
+            // assignee per the roadmap doc), not settled here — this is the minimal, additive grant
+            // this one ticket's own stated requirement needs, not a broader permission redesign.
             var productionHousePermissions = new[]
             {
+                ViewUsers,
                 ViewProjects, CreateProjects, EditProjects,
                 RequestService, ViewServiceRequests,
                 ViewWorkers,
@@ -111,6 +120,7 @@ namespace Maydan.Infrastructure.Persistence.Seed
 
             var associationPermissions = new[]
             {
+                ViewUsers,
                 ViewAssociations, EditAssociations, ManageWorkers, ManageServices, ViewAssociationUsers,
                 ViewGroups, ManageGroups,
                 ViewAttendance, ManageAttendance,

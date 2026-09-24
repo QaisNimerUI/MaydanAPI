@@ -8,6 +8,15 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(int userId, CancellationToken cancellationToken = default);
     Task<User?> GetByEmailWithAccessAsync(string email, CancellationToken cancellationToken = default);
     Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default);
+
+    // MAYD-20: real server-side pagination + status filter, on top of the same search behavior as
+    // GetByEntityAsync above (kept as its own method rather than adding optional params to that
+    // one — GetByEntityAsync has other real callers, e.g. UserManagementService.CreateUserAsync's
+    // duplicate-name checks via GetByUserNameEnAsync/GetByUserNameArAsync elsewhere, that have no
+    // use for paging/status and shouldn't need to pass through defaults for it).
+    Task<(List<User> Users, int TotalCount)> GetPagedByEntityAsync(
+        EntityType entityType, int entityId, string? search, bool? isActive, int page, int pageSize,
+        CancellationToken cancellationToken = default);
     Task<User?> GetDetailsAsync(int userId, CancellationToken cancellationToken = default);
     Task<User?> GetDetailsReadOnlyAsync(int userId, CancellationToken cancellationToken = default);
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);

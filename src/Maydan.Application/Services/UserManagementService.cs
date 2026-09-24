@@ -1,6 +1,7 @@
 using Maydan.Application.DTOs.UserManagement;
 using Maydan.Application.Interfaces;
 using Maydan.Domain.Entities;
+using Maydan.Domain.Enums;
 
 namespace Maydan.Application.Services;
 
@@ -21,6 +22,41 @@ public class UserManagementService : IUserManagementService
         var users = await _unitOfWork.Users.GetByEntityAsync(currentUser.EntityType, currentUser.EntityId, search, cancellationToken);
 
         return users.Select(MapUserSummary).ToList();
+    }
+
+    // MAYD-20: real Users List page — search/status/pagination, entity-scoped per the real
+    // Business Rule (MAYD-1): Bayt-AlUrdon and ASEZA may pass entityType/entityId to view a
+    // DIFFERENT entity's users (ASEZA's is explicitly read-only by the BR — naturally true here
+    // since this method only ever reads, never mutates); every other role may only view its own
+    // entity and gets rejected for anything else. Matches PermissionSeedConfiguration.cs's real
+    // ViewUsers(1)/ManageUsers(3) — same permission pair users.routes.ts's own roleGuard already
+    // gates this page on — not a new ad hoc role check.
+    public async Task<PagedUsersDto> GetUsersPagedAsync(
+        int currentUserId, string? search, bool? isActive, int page, int pageSize,
+        EntityType? entityType, int? entityId, CancellationToken cancellationToken = default)
+    {
+        var currentUser = await _unitOfWork.Users.GetWithPermissionsAsync(currentUserId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Current user was not found.");
+
+        if (!currentUser.IsActive)
+        {
+            throw new UnauthorizedAccessException("Current user is inactive.");
+        }
+
+        if (!GetEffectivePermissionIds(currentUser).Overlaps(new[] { ViewUsersPermissionId, ManageUsersPermissionId }))
+        {
+            throw new UnauthorizedAccessException("Caller does not hold the View Users permission.");
+        }
+
+        var (targetEntityType, targetEntityId) = ResolveTargetEntity(currentUser, entityType, entityId);
+
+        var safePage = page < 1 ? 1 : page;
+        var safePageSize = pageSize is < 1 or > 100 ? 10 : pageSize;
+
+        var (users, totalCount) = await _unitOfWork.Users.GetPagedByEntityAsync(
+            targetEntityType, targetEntityId, search, isActive, safePage, safePageSize, cancellationToken);
+
+        return new PagedUsersDto(users.Select(MapUserSummary).ToList(), totalCount, safePage, safePageSize);
     }
 
     public async Task<UserDetailsDto> GetUserDetailsAsync(int currentUserId, int userId, CancellationToken cancellationToken = default)
@@ -298,6 +334,60 @@ public class UserManagementService : IUserManagementService
         }
 
         return user;
+    }
+
+    // Matches PermissionSeedConfiguration.cs ids 1/3.
+    private const int ViewUsersPermissionId = 1;
+    private const int ManageUsersPermissionId = 3;
+
+    // MAYD-20: Business Rule (MAYD-1) — only Bayt-AlUrdon and ASEZA may view an entity other than
+    // their own; every other role is rejected for anything but its own entity. Requesting no
+    // override (both null) always resolves to the caller's own entity, so existing callers of the
+    // paginated endpoint that never pass these params keep the exact same "current entity" behavior
+    // GetUsersAsync above already has.
+    private static (EntityType EntityType, int EntityId) ResolveTargetEntity(User currentUser, EntityType? entityType, int? entityId)
+    {
+        if (entityType is null && entityId is null)
+        {
+            return (currentUser.EntityType, currentUser.EntityId);
+        }
+
+        if (entityType is null || entityId is null)
+        {
+            throw new InvalidOperationException("entityType and entityId must both be provided together.");
+        }
+
+        var isOwnEntity = entityType == currentUser.EntityType && entityId == currentUser.EntityId;
+        var canViewOtherEntities = currentUser.EntityType is EntityType.BaytAlUrdon or EntityType.Aseza;
+
+        if (!isOwnEntity && !canViewOtherEntities)
+        {
+            throw new UnauthorizedAccessException("Cannot view users outside your own entity.");
+        }
+
+        return (entityType.Value, entityId.Value);
+    }
+
+    // Same shape as EntityOnboardingService.GetEffectivePermissionIds — deliberately duplicated
+    // rather than shared, matching this codebase's established per-service convention (see that
+    // method's own history/comment on why).
+    private static HashSet<int> GetEffectivePermissionIds(User user)
+    {
+        var rolePermissionIds = user.Role.RolePermissions
+            .Where(rp => rp.IsActive && rp.Permission.IsActive)
+            .Select(rp => rp.PermissionId);
+
+        var directPermissionIds = user.UserPermissions
+            .Where(up => up.IsActive && up.Permission.IsActive)
+            .Select(up => up.PermissionId);
+
+        var groupPermissionIds = user.UserGroups
+            .Where(ug => ug.Group.IsActive)
+            .SelectMany(ug => ug.Group.GroupPermissions)
+            .Where(gp => gp.IsActive && gp.Permission.IsActive)
+            .Select(gp => gp.PermissionId);
+
+        return rolePermissionIds.Concat(directPermissionIds).Concat(groupPermissionIds).ToHashSet();
     }
 
     private async Task<User> GetScopedUserAsync(int userId, User currentUser, CancellationToken cancellationToken)

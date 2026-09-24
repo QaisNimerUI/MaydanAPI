@@ -1,5 +1,6 @@
 using Maydan.Application.DTOs.UserManagement;
 using Maydan.Application.Interfaces;
+using Maydan.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,6 +15,41 @@ public class UsersController : ApiControllerBase
     public UsersController(IUserManagementService userManagementService)
     {
         _userManagementService = userManagementService;
+    }
+
+    // MAYD-20: the real Users List page's endpoint — paginated, status-filterable, searchable by
+    // name/email/phone, entity-scoped per the real Business Rule (Bayt-AlUrdon/ASEZA may pass
+    // entityType/entityId to view a different entity; everyone else may not — enforced in
+    // UserManagementService.GetUsersPagedAsync, not here). Deliberately a separate action from
+    // current-entity/search below rather than adding params to either of those — both have other
+    // real callers (the UserOption dropdown API) that expect a plain array, not this paginated
+    // envelope, and neither needs pagination for that lightweight use.
+    [HttpGet(Name = "Get Users")]
+    public async Task<ActionResult<PagedUsersDto>> GetUsers(
+        [FromQuery] string? search,
+        [FromQuery] bool? isActive,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        [FromQuery] EntityType? entityType,
+        [FromQuery] int? entityId,
+        [FromHeader(Name = "X-Current-User-Id")] int? currentUserHeader,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized(new { message = "Current user id is required." });
+        }
+
+        try
+        {
+            return Ok(await _userManagementService.GetUsersPagedAsync(
+                currentUserId, search, isActive, page == 0 ? 1 : page, pageSize == 0 ? 10 : pageSize,
+                entityType, entityId, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
     }
 
     [HttpGet("current-entity", Name = "Get Current Entity Users")]

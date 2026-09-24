@@ -56,6 +56,43 @@ public class UserRepository : IUserRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(List<User> Users, int TotalCount)> GetPagedByEntityAsync(
+        EntityType entityType, int entityId, string? search, bool? isActive, int page, int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .Where(u => u.EntityType == entityType && u.EntityId == entityId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(u =>
+                u.FirstNameEn.Contains(term) ||
+                u.LastNameEn.Contains(term) ||
+                u.FirstNameAr.Contains(term) ||
+                u.LastNameAr.Contains(term) ||
+                u.Email.Contains(term) ||
+                u.PhoneNumber.Contains(term));
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(u => u.IsActive == isActive.Value);
+        }
+
+        query = query.OrderBy(u => u.FirstNameEn).ThenBy(u => u.LastNameEn);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var users = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (users, totalCount);
+    }
+
     public Task<User?> GetDetailsAsync(int userId, CancellationToken cancellationToken = default) =>
         _context.Users
             .Include(u => u.Role)
