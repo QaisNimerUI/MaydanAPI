@@ -14,45 +14,78 @@ public class ProjectService : IProjectService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<List<ProjectDto>> GetAllAsync(
+        int currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentProductionCompanyUserAsync(currentUserId, cancellationToken);
+        var projects = await _unitOfWork.Projects.GetByProductionCompanyIdAsync(
+            currentUser.EntityId,
+            cancellationToken);
+
+        return projects.Select(MapToDto).ToList();
+    }
+
+    public async Task<ProjectDto> GetByIdAsync(
+        int projectId,
+        int currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentProductionCompanyUserAsync(currentUserId, cancellationToken);
+        var project = await _unitOfWork.Projects.GetByIdAsync(projectId, cancellationToken)
+            ?? throw new KeyNotFoundException("Project was not found.");
+
+        EnsureProjectVisibleToUser(project, currentUser);
+
+        return MapToDto(project);
+    }
+
     public async Task<ProjectDto> CreateAsync(
         CreateProjectDto request,
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var currentUser = await _unitOfWork.Users.GetByIdAsync(
-            currentUserId,
-            cancellationToken);
-
-        if (currentUser is null)
-            throw new Exception("Current user not found.");
-
-        if (currentUser.EntityType != EntityType.ProductionCompany)
-            throw new Exception(
-                "Only Production Company users can create projects.");
+        var currentUser = await GetCurrentProductionCompanyUserAsync(currentUserId, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(request.ProjectNameEn))
-            throw new Exception(
-                "English project name is required.");
+        {
+            throw new InvalidOperationException("English project name is required.");
+        }
 
         if (string.IsNullOrWhiteSpace(request.ProjectNameAr))
-            throw new Exception(
-                "Arabic project name is required.");
+        {
+            throw new InvalidOperationException("Arabic project name is required.");
+        }
 
         if (request.ProjectNameEn.Trim().Length > 200)
-            throw new Exception(
-                "English project name cannot exceed 200 characters.");
+        {
+            throw new InvalidOperationException("English project name cannot exceed 200 characters.");
+        }
 
         if (request.ProjectNameAr.Trim().Length > 200)
-            throw new Exception(
-                "Arabic project name cannot exceed 200 characters.");
+        {
+            throw new InvalidOperationException("Arabic project name cannot exceed 200 characters.");
+        }
 
         if (request.EndDate <= request.StartDate)
-            throw new Exception(
-                "End date must be greater than start date.");
+        {
+            throw new InvalidOperationException("End date must be greater than start date.");
+        }
 
         if (request.ProducerUserId == request.LocationManagerUserId)
-            throw new Exception(
-                "Producer and Location Manager must be different users.");
+        {
+            throw new InvalidOperationException("Producer and Location Manager must be different users.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.WorkPermitImagePath))
+        {
+            throw new InvalidOperationException("Work permit image path is required.");
+        }
+
+        if (request.WorkPermitImagePath.Trim().Length > 500)
+        {
+            throw new InvalidOperationException("Work permit image path cannot exceed 500 characters.");
+        }
 
         var projectTypeExists =
             await _unitOfWork.ProjectTypes.ExistsAsync(
@@ -60,7 +93,9 @@ public class ProjectService : IProjectService
                 cancellationToken);
 
         if (!projectTypeExists)
-            throw new Exception("Invalid Project Type.");
+        {
+            throw new InvalidOperationException("Invalid Project Type.");
+        }
 
         var producer =
             await _unitOfWork.Users.GetByIdAsync(
@@ -68,7 +103,9 @@ public class ProjectService : IProjectService
                 cancellationToken);
 
         if (producer is null)
-            throw new Exception("Producer not found.");
+        {
+            throw new KeyNotFoundException("Producer was not found.");
+        }
 
         var locationManager =
             await _unitOfWork.Users.GetByIdAsync(
@@ -76,20 +113,20 @@ public class ProjectService : IProjectService
                 cancellationToken);
 
         if (locationManager is null)
-            throw new Exception("Location Manager not found.");
+        {
+            throw new KeyNotFoundException("Location Manager was not found.");
+        }
 
         if (producer.EntityType != EntityType.ProductionCompany ||
             producer.EntityId != currentUser.EntityId)
         {
-            throw new Exception(
-                "Producer must belong to the same Production Company.");
+            throw new UnauthorizedAccessException("Producer must belong to the same Production Company.");
         }
 
         if (locationManager.EntityType != EntityType.ProductionCompany ||
             locationManager.EntityId != currentUser.EntityId)
         {
-            throw new Exception(
-                "Location Manager must belong to the same Production Company.");
+            throw new UnauthorizedAccessException("Location Manager must belong to the same Production Company.");
         }
 
         var project = new Project
@@ -105,7 +142,7 @@ public class ProjectService : IProjectService
             ProducerUserId = request.ProducerUserId,
             LocationManagerUserId = request.LocationManagerUserId,
 
-            WorkPermitImagePath = request.WorkPermitImagePath,
+            WorkPermitImagePath = request.WorkPermitImagePath.Trim(),
 
             ProductionCompanyId = currentUser.EntityId,
 
@@ -126,10 +163,37 @@ public class ProjectService : IProjectService
                 cancellationToken);
 
         if (createdProject is null)
-            throw new Exception(
-                "Project could not be loaded after creation.");
+        {
+            throw new KeyNotFoundException("Project could not be loaded after creation.");
+        }
 
         return MapToDto(createdProject);
+    }
+
+    private async Task<User> GetCurrentProductionCompanyUserAsync(int currentUserId, CancellationToken cancellationToken)
+    {
+        var currentUser = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Current user was not found.");
+
+        if (!currentUser.IsActive)
+        {
+            throw new UnauthorizedAccessException("Current user is inactive.");
+        }
+
+        if (currentUser.EntityType != EntityType.ProductionCompany)
+        {
+            throw new UnauthorizedAccessException("Only Production Company users can access projects.");
+        }
+
+        return currentUser;
+    }
+
+    private static void EnsureProjectVisibleToUser(Project project, User currentUser)
+    {
+        if (project.ProductionCompanyId != currentUser.EntityId)
+        {
+            throw new UnauthorizedAccessException("Cannot access projects outside the current Production Company.");
+        }
     }
 
     private static ProjectDto MapToDto(Project project)
