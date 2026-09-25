@@ -15,7 +15,7 @@
 > لسا ما انبنت الـ Controllers.
 
 ## قواعد البزنس (Business Rules)
-- **CivilId**: حقل واحد موحّد (يلغي `civilainId`/`civilianId`/`civilainIdNumber` القديمة)، required، **مشفّر عند التخزين بشكل عشوائي (non-deterministic) وبدون unique constraint عليه مباشرة**.
+- **CivilId**: حقل واحد موحّد (يلغي `civilainId`/`civilianId`/`civilainIdNumber` القديمة)، required. **لسا plaintext حاليًا وليس مشفّرًا** — التشفير (عبر `ISecretProtector`، نفس الآلية الموجودة فعليًا والمستخدمة لـ SMTP password) **مخطط له بس لسا ما انبنى** (شوف "أسئلة مفتوحة" تحت)، وبدون unique constraint عليه مباشرة حتى بعد ما ينبنى التشفير (لأنو الـ ciphertext مش قابل للمقارنة/البحث المباشر).
 - **CivilIdHash (Blind Index)**: `HMAC-SHA256(CivilId)` بمفتاح سري على مستوى السيرفر (`ICivilIdHasher` بـ `Maydan.Application`، تطبيقه الفعلي `HmacCivilIdHasher` بـ `Maydan.Infrastructure`، المفتاح من `Security:CivilIdHashKey` عبر user-secrets/env var — نفس منطق `Jwt:Key`). **هاد العمود هو يلي عليه الـ unique index والبحث** (`IWorkerRepository.GetByCivilIdHashAsync`)، مش `CivilId` نفسه.
 - **QrCode**: بيتولّد تلقائيًا عند إنشاء العامل، unique.
 - `AssociationId` required — كل عامل مرتبط بجمعية واحدة بأي وقت (افتراض، شوف تحت).
@@ -25,7 +25,7 @@
 
 ## أسئلة مفتوحة / غير محسومة
 - **هل رقم الهوية الوطنية (CivilId) الخاص بعامل تم حذفه (Soft Delete) قابل لإعادة الاستخدام لعامل جديد؟** الـ Soft Delete (`IsDeleted`) بيخلي سجل العامل القديم موجود بالجدول (بس مستبعد من الاستعلامات عبر الـ query filter)، والـ unique index على `CivilIdHash` رح يمنع تسجيل نفس رقم الهوية من جديد طالما السجل القديم موجود — حتى لو العامل "محذوف" منطقيًا. لازم قرار من البزنس: هل هاي الحالة مقصودة (منع إعادة الاستخدام نهائيًا)، أو لازم آلية استثناء (مثلاً استرجاع السجل القديم بدل إنشاء جديد، أو hard-delete بعد فترة احتفاظ معيّنة)؟
-- **تشفير CivilId الفعلي (AES أو ما يعادله) لسا ما انبنى** — العمود مصمم ومهيّأ (`nvarchar(256)`, بدون unique) والـ blind index (`CivilIdHash`) شغّال، بس القيمة المخزّنة بـ `CivilId` نفسها لسا plaintext لحد ما ينبنى الـ encryption layer (قرار تقني منفصل عن الـ blind index، يحتاج تصميم إدارة مفاتيح).
+- **تشفير CivilId الفعلي لسا ما انبنى** — العمود مصمم ومهيّأ (`nvarchar(256)`, بدون unique) والـ blind index (`CivilIdHash`) شغّال، بس القيمة المخزّنة بـ `CivilId` نفسها لسا plaintext لحد ما ينبنى الـ encryption layer. الآلية الجاهزة لهاد الغرض موجودة فعليًا الآن (`ISecretProtector`/`DataProtectionSecretProtector`، نفس اللي بيشفّر SMTP password اليوم) — يعني القرار المتبقي مش "شو الآلية"، بل "متى/مين بيبني فعليًا Workers CRUD ويستدعي `Protect`/`Unprotect` عليها" (شوف تعليق `Worker.CivilId` بالكود للتفاصيل، بما فيها ملاحظة الـ purpose string المنفصل ومسألة تخزين المفاتيح عبر أكثر من instance).
 - **AssociationId required**: افتراض مبني على BRD (11.1) "كل عامل مرتبط بجمعية واحدة بأي وقت" — يستاهل تأكيد صريح إذا التسجيل ممكن يصير بدون جمعية أول.
 - **صيغة QrCode**: Guid أو كود قصير؟ القرار يرجع لفريق الباك، لسا غير محسوم.
 - **متعمّد الاستبعاد**: `DailyWageAmount` مو خاصية بالعامل — هي خاصية بربط العامل بمشروع معيّن (`ProjectWorker`)، ومؤجلة مع منظومة Service Request.

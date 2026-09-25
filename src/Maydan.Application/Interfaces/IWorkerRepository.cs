@@ -6,8 +6,11 @@ public interface IWorkerRepository
 {
     Task<Worker?> GetByIdAsync(int workerId, CancellationToken cancellationToken = default);
 
-    // civilIdHash is the blind index (ICivilIdHasher.ComputeHash) — CivilId itself is encrypted
-    // non-deterministically and can't be queried directly.
+    // civilIdHash is the blind index (ICivilIdHasher.ComputeHash). CivilId itself is currently
+    // PLAINTEXT (see Worker.CivilId's own comment — encryption via ISecretProtector is planned but
+    // not yet implemented); this lookup exists regardless because even once that's wired up,
+    // ciphertext still can't be queried/compared directly, so CivilIdHash remains the only way to
+    // look a worker up by civil ID.
     Task<Worker?> GetByCivilIdHashAsync(string civilIdHash, CancellationToken cancellationToken = default);
     Task<List<Worker>> GetByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default);
     Task AddAsync(Worker worker, CancellationToken cancellationToken = default);

@@ -16,8 +16,11 @@ public class WorkerConfiguration : IEntityTypeConfiguration<Worker>
         builder.Property(w => w.MiddleName).HasMaxLength(100);
         builder.Property(w => w.LastName).IsRequired().HasMaxLength(100);
 
-        // Sized for ciphertext, not the raw national ID. No unique index: the encryption is
-        // non-deterministic, so uniqueness is enforced via CivilIdHash (blind index) instead.
+        // Repo-hygiene fix (2026-09-26): 256 chars is sized for future ciphertext, not the raw
+        // national ID length — but that encryption doesn't exist yet (see Worker.CivilId's own
+        // comment; CivilId is currently plaintext). No unique index either way: uniqueness is
+        // enforced via CivilIdHash (blind index) instead, since ciphertext won't be directly
+        // comparable once encryption is actually implemented.
         builder.Property(w => w.CivilId).IsRequired().HasMaxLength(256);
 
         // HMAC-SHA256 hex digest is always 64 chars.
