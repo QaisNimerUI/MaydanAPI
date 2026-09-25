@@ -84,7 +84,7 @@ public class UserManagementService : IUserManagementService
 
         var permissionIds = NormalizeIds(dto.PermissionIds);
         await EnsurePermissionsExistAsync(permissionIds, cancellationToken);
-        EnsurePermissionsAllowedForRole(role, permissionIds);
+        EnsurePermissionsAllowedForRole(role, permissionIds, GetCallerDelegatablePermissionIds(currentUser, role));
 
         // Same role as the creator (the only case every role but Bayt-AlUrdon can ever reach, per
         // EnsureSameEntityCreation above) keeps the exact prior behavior: the new user belongs to the
@@ -134,7 +134,7 @@ public class UserManagementService : IUserManagementService
 
     public async Task<List<PermissionDto>> GetAvailablePermissionsAsync(int currentUserId, int? roleId, CancellationToken cancellationToken = default)
     {
-        await GetCurrentUserAsync(currentUserId, cancellationToken);
+        var caller = await GetCurrentUserAsync(currentUserId, cancellationToken);
 
         if (!roleId.HasValue)
         {
@@ -145,9 +145,28 @@ public class UserManagementService : IUserManagementService
         var role = await _unitOfWork.Roles.GetWithPermissionsAsync(roleId.Value, cancellationToken)
             ?? throw new KeyNotFoundException("Role was not found.");
 
+        // MAYD-37: the Permission Picker's own catalog must offer exactly what
+        // EnsurePermissionsAllowedForRole will actually accept on save — role's own catalog PLUS
+        // whatever the caller can personally delegate (see GetCallerDelegatablePermissionIds's own
+        // comment; empty unless caller and target share the same role, e.g. the ASEZA admin editing
+        // a fellow ASEZA user). Sourced directly from the caller's already-loaded UserPermissions/
+        // GroupPermissions navigation rather than a second DB round-trip.
+        var delegatableIds = GetCallerDelegatablePermissionIds(caller, role);
+        var delegatablePermissions = caller.UserPermissions
+            .Where(up => up.IsActive && up.Permission.IsActive && delegatableIds.Contains(up.PermissionId))
+            .Select(up => up.Permission)
+            .Concat(caller.UserGroups
+                .Where(ug => ug.Group.IsActive)
+                .SelectMany(ug => ug.Group.GroupPermissions)
+                .Where(gp => gp.IsActive && gp.Permission.IsActive && delegatableIds.Contains(gp.PermissionId))
+                .Select(gp => gp.Permission));
+
         return role.RolePermissions
             .Where(rp => rp.IsActive && rp.Permission.IsActive)
-            .Select(rp => MapPermission(rp.Permission))
+            .Select(rp => rp.Permission)
+            .Concat(delegatablePermissions)
+            .DistinctBy(p => p.PermissionId)
+            .Select(MapPermission)
             .OrderBy(p => p.Module)
             .ThenBy(p => p.PermissionNameEn)
             .ToList();
@@ -315,7 +334,7 @@ public class UserManagementService : IUserManagementService
 
         var permissionIds = NormalizeIds(dto.PermissionIds);
         await EnsurePermissionsExistAsync(permissionIds, cancellationToken);
-        await EnsurePermissionsAllowedForRoleAsync(user.RoleId, permissionIds, cancellationToken);
+        await EnsurePermissionsAllowedForRoleAsync(currentUser, user.RoleId, permissionIds, cancellationToken);
 
         SyncUserPermissions(user, permissionIds);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -344,9 +363,20 @@ public class UserManagementService : IUserManagementService
         return user.EffectivePermissions;
     }
 
+    // MAYD-37 (2026-09-24): now fetches via GetDetailsAsync instead of the bare GetByIdAsync, so
+    // UserPermissions/UserGroups(.Group.GroupPermissions) are loaded for every caller of this
+    // method — needed by GetCallerDelegatablePermissionIds below (CreateUserAsync,
+    // UpdateDirectPermissionsAsync, GetAvailablePermissionsAsync all call this for the CALLER, not
+    // just the target). Confirmed safe for every existing caller: every one of them only ever reads
+    // currentUser's scalar fields (EntityType/EntityId/RoleId) or passes it to
+    // GetEffectivePermissionIds — never relies on Role.RolePermissions being loaded from this
+    // specific fetch (GetDetailsAsync doesn't include that; GetUsersPagedAsync's own
+    // GetEffectivePermissionIds(currentUser) call uses a separate GetWithPermissionsAsync fetch that
+    // does), and none of them mutate-and-save currentUser (always read-only here), so loading extra
+    // navigation properties changes nothing about existing behavior.
     private async Task<User> GetCurrentUserAsync(int currentUserId, CancellationToken cancellationToken)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
+        var user = await _unitOfWork.Users.GetDetailsAsync(currentUserId, cancellationToken)
             ?? throw new UnauthorizedAccessException("Current user was not found.");
 
         if (!user.IsActive)
@@ -355,6 +385,48 @@ public class UserManagementService : IUserManagementService
         }
 
         return user;
+    }
+
+    // MAYD-37 (2026-09-24, product-owner-confirmed): the necessary completion of "ASEZA Admin has
+    // all view permissions by default; a regular ASEZA user gets a custom subset assigned by the
+    // Admin, reusing the same Groups and Permissions pattern as MAYD-2" — confirmed against the real
+    // code (not assumed) that this doesn't work without it. The ASEZA admin's new page-view
+    // permissions are granted as individual UserPermissions, NOT via ASEZA's own RolePermissions
+    // (see RolePermissionSeedConfiguration.cs's own comment on why a role-level grant would defeat
+    // "custom subset" entirely). But EnsurePermissionsAllowedForRole below only ever allowed
+    // assigning a permission that's in the TARGET user's OWN ROLE's RolePermissions catalog (Phase
+    // 5.5, "Prevent Permission Escalation" — UserManagementModule.md) — meaning, unmodified, the
+    // admin could never actually hand these permissions to a fellow ASEZA user via the existing,
+    // already-verified User Details "Edit Permissions" flow (MAYD-34): every attempt would 400 with
+    // "not available for the selected role", and the Permission Picker wouldn't even offer them
+    // (GetAvailablePermissionsAsync's roleId branch has the exact same role-catalog-only shape).
+    //
+    // Resolution: a caller may additionally delegate any permission they PERSONALLY hold (direct or
+    // via their own group), but ONLY when assigning to a user of their OWN SAME role — this is
+    // strictly a widening, never a narrowing (nothing granted that the caller doesn't already
+    // themselves hold), and the same-role restriction means it can never fire for a cross-role case
+    // like Bayt-AlUrdon creating an Association user (MAYD-1) — that path is completely unaffected,
+    // confirmed by this method returning an empty set whenever roles differ. Applied to
+    // CreateUserAsync, UpdateDirectPermissionsAsync, and GetAvailablePermissionsAsync alike, so the
+    // Permission Picker's displayed catalog and the actual backend validation never disagree.
+    private static HashSet<int> GetCallerDelegatablePermissionIds(User caller, Role targetRole)
+    {
+        if (caller.RoleId != targetRole.RoleId)
+        {
+            return new HashSet<int>();
+        }
+
+        var directIds = caller.UserPermissions
+            .Where(up => up.IsActive && up.Permission.IsActive)
+            .Select(up => up.PermissionId);
+
+        var groupIds = caller.UserGroups
+            .Where(ug => ug.Group.IsActive)
+            .SelectMany(ug => ug.Group.GroupPermissions)
+            .Where(gp => gp.IsActive && gp.Permission.IsActive)
+            .Select(gp => gp.PermissionId);
+
+        return directIds.Concat(groupIds).ToHashSet();
     }
 
     // Matches PermissionSeedConfiguration.cs ids 1/3.
@@ -515,7 +587,7 @@ public class UserManagementService : IUserManagementService
         }
     }
 
-    private async Task EnsurePermissionsAllowedForRoleAsync(int roleId, List<int> permissionIds, CancellationToken cancellationToken)
+    private async Task EnsurePermissionsAllowedForRoleAsync(User caller, int roleId, List<int> permissionIds, CancellationToken cancellationToken)
     {
         if (permissionIds.Count == 0)
         {
@@ -525,10 +597,10 @@ public class UserManagementService : IUserManagementService
         var role = await _unitOfWork.Roles.GetWithPermissionsAsync(roleId, cancellationToken)
             ?? throw new KeyNotFoundException("Role was not found.");
 
-        EnsurePermissionsAllowedForRole(role, permissionIds);
+        EnsurePermissionsAllowedForRole(role, permissionIds, GetCallerDelegatablePermissionIds(caller, role));
     }
 
-    private static void EnsurePermissionsAllowedForRole(Role role, List<int> permissionIds)
+    private static void EnsurePermissionsAllowedForRole(Role role, List<int> permissionIds, HashSet<int>? callerDelegatableIds = null)
     {
         if (permissionIds.Count == 0)
         {
@@ -539,6 +611,11 @@ public class UserManagementService : IUserManagementService
             .Where(rp => rp.IsActive && rp.Permission.IsActive)
             .Select(rp => rp.PermissionId)
             .ToHashSet();
+
+        if (callerDelegatableIds is not null)
+        {
+            allowedPermissionIds.UnionWith(callerDelegatableIds);
+        }
 
         if (permissionIds.Any(permissionId => !allowedPermissionIds.Contains(permissionId)))
         {

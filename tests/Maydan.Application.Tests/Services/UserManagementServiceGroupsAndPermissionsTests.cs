@@ -187,7 +187,11 @@ public class UserManagementServiceGroupsAndPermissionsTests
 
         public Task<User?> GetByEmailWithAccessAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<User?> GetDetailsAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        // MAYD-37: GetCurrentUserAsync now fetches via GetDetailsAsync (not GetByIdAsync) so
+        // UserPermissions/UserGroups are loaded for the caller — same caller lookup as GetByIdAsync
+        // above, since this fake's User has no real navigation-loading distinction.
+        public Task<User?> GetDetailsAsync(int userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(userId == _currentUser.UserId ? _currentUser : null);
         public Task<User?> GetDetailsReadOnlyAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetByUserNameEnAsync(User user, CancellationToken cancellationToken = default) => throw new NotSupportedException();

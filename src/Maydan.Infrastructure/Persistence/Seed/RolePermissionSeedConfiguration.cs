@@ -96,14 +96,42 @@ namespace Maydan.Infrastructure.Persistence.Seed
             // ZERO Create-Users-equivalent permission (confirmed live during the MAYD-36 sweep), so
             // /users/new 403'd via the frontend's own roleGuard (['Create Users', 'Manage Users'])
             // even though nothing else about ASEZA's own-entity user creation was ever broken.
+            //
+            // MAYD-37 real fix (2026-09-24, product-owner-confirmed): ViewAssociations,
+            // ViewProductionCompanies, ViewProductionHouses, ViewWorkers, ViewProjects,
+            // ViewAttendance, ViewPayments REMOVED from this role-level array — the ticket's own
+            // requirement ("ASEZA Admin has all view permissions by default; a regular ASEZA user
+            // gets a custom subset assigned by the Admin") is structurally impossible while these
+            // stay here: AuthService.MapAuthUser computes effective permissions as a pure
+            // RolePermissions ∪ UserPermissions ∪ GroupPermissions union with no per-user revoke, so
+            // anything granted at the ROLE level is automatically held by EVERY ASEZA user, admin
+            // and regular alike — no "custom subset" is possible for a role-level grant. These 7 are
+            // instead granted directly to the seeded ASEZA admin (UserId 1000) as individual
+            // UserPermissions (see UserSeedConfiguration.cs's own migration for this ticket) — a
+            // fresh regular ASEZA user now genuinely starts with none of them, and the admin assigns
+            // a real subset via the existing, already-verified User Details "Edit Permissions" flow
+            // (MAYD-34) — UpdateDirectPermissionsAsync/GetAvailablePermissionsAsync were extended
+            // (see GetCallerDelegatablePermissionIds's own comment) so that flow can actually offer
+            // and accept a permission the ASEZA ROLE doesn't hold but the assigning ASEZA admin
+            // personally does.
+            //
+            // ManageAssociations REMOVED ENTIRELY, not re-granted anywhere (not even to the admin):
+            // the frontend (associations-list/association-details components, associations.routes.ts)
+            // treats 'Manage Associations' as a full Create+Edit+Delete+View substitute — ASEZA
+            // holding it meant ASEZA could fully create/edit/delete Associations, directly
+            // contradicting this ticket's explicit "view-only, no create, edit or delete actions on
+            // that data" requirement (Associations is one of the ticket's own named example modules).
+            // ManageProductionHouses is deliberately left untouched despite its name: confirmed via
+            // ProductionHouseDetailsComponent's own comment that it is NOT actually used to gate any
+            // write action anywhere in the frontend today ("that permission covers ASEZA's oversight
+            // visibility, not this specific action") — inert, so removing it would be a no-op change
+            // with only risk and no real behavior fix, unlike ManageAssociations.
             var asezaPermissions = new[]
             {
-                ViewUsers, CreateUsers, ViewAssociations, ManageAssociations, ViewAssociationUsers,
-                ViewProductionCompanies, ViewProductionHouses, ManageProductionHouses,
-                ViewWorkers, ViewProjects, ManageServices,
-                ViewGroups, ManageGroups,
-                ViewAttendance,
-                ViewPayments
+                ViewUsers, CreateUsers, ViewAssociationUsers,
+                ManageProductionHouses,
+                ManageServices,
+                ViewGroups, ManageGroups
             };
 
             // MAYD-20 (2026-09-24): ViewUsers added to both arrays below — previously granted to
