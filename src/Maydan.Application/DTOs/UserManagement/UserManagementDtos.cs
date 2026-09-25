@@ -121,3 +121,8 @@ public class UpdateUserGroupsDto
 {
     public List<int> GroupIds { get; set; } = new();
 }
+
+public class UpdateUserStatusDto
+{
+    public bool IsActive { get; set; }
+}

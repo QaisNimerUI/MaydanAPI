@@ -363,6 +363,55 @@ public class UserManagementService : IUserManagementService
         return user.EffectivePermissions;
     }
 
+    // Activate/Deactivate User (UserManagementModule.md Phase 4.3): "Avoid hard delete unless
+    // explicitly required by the business" — this only ever flips IsActive, never touches
+    // IsDeleted/DeletedAt. No MAYD subtask covers this; built from that doc plus the two closest
+    // real precedents already in this class:
+    //   - Self-check FIRST, before any repository round trip, mirroring
+    //     UpdateDirectPermissionsAsync's own "cannot modify your own permissions" rule (Phase 5.4) —
+    //     a user cannot deactivate (or reactivate) their own account through this endpoint either,
+    //     rejected here regardless of dto.IsActive's direction, not just for the downgrade case,
+    //     since a deactivated caller could never reach this endpoint to reactivate themselves anyway.
+    //   - Strict same-entity scoping via GetScopedUserAsync — the exact same write-path rule
+    //     UpdateDirectPermissionsAsync/UpdateGroupsAsync already use, deliberately NOT given the
+    //     Bayt-AlUrdon/ASEZA cross-entity VIEW override (see that method's own comment on why writes
+    //     stay strict).
+    // New here: an explicit Manage Users (PermissionId 3) gate. Every other write path in this class
+    // only relies on [Authorize] + entity-scoping with no permission-bit check of its own — but this
+    // ticket asked specifically for one, and ManageUsersPermissionId's one existing real usage
+    // (GetUsersPagedAsync's read gate) is the only established pattern for checking it, so that's
+    // what this reuses rather than inventing a different shape. GetWithPermissionsAsync (not
+    // GetCurrentUserAsync's GetDetailsAsync) is required here for the same reason
+    // GetUsersPagedAsync/RefreshTokenAsync already use it: GetEffectivePermissionIds reads
+    // user.Role.RolePermissions, which GetDetailsAsync never loads.
+    public async Task<UserDetailsDto> UpdateUserStatusAsync(int currentUserId, int userId, UpdateUserStatusDto dto, CancellationToken cancellationToken = default)
+    {
+        if (currentUserId == userId)
+        {
+            throw new UnauthorizedAccessException("You cannot change your own account status.");
+        }
+
+        var currentUser = await _unitOfWork.Users.GetWithPermissionsAsync(currentUserId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Current user was not found.");
+
+        if (!currentUser.IsActive)
+        {
+            throw new UnauthorizedAccessException("Current user is inactive.");
+        }
+
+        if (!GetEffectivePermissionIds(currentUser).Contains(ManageUsersPermissionId))
+        {
+            throw new UnauthorizedAccessException("Caller does not hold the Manage Users permission.");
+        }
+
+        var user = await GetScopedUserAsync(userId, currentUser, cancellationToken);
+
+        user.IsActive = dto.IsActive;
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetUserDetailsAsync(currentUserId, userId, cancellationToken);
+    }
+
     // MAYD-37 (2026-09-24): now fetches via GetDetailsAsync instead of the bare GetByIdAsync, so
     // UserPermissions/UserGroups(.Group.GroupPermissions) are loaded for every caller of this
     // method — needed by GetCallerDelegatablePermissionIds below (CreateUserAsync,

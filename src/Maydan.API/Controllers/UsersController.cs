@@ -161,6 +161,30 @@ public class UsersController : ApiControllerBase
         }
     }
 
+    // Activate/Deactivate User (UserManagementModule.md Phase 4.3) — no MAYD subtask covers this
+    // directly, see UserManagementService.UpdateUserStatusAsync's own comment for the full rationale
+    // (self-check, entity-scoping, and the new Manage Users permission gate). PATCH, not PUT, since
+    // this only ever flips one field rather than replacing a whole collection the way
+    // direct-permissions/update and groups/update do — same "...update" naming shape kept anyway for
+    // consistency with those two siblings.
+    [HttpPatch("{userId:int}/status/update", Name = "Update User Status")]
+    public async Task<ActionResult<UserDetailsDto>> UpdateUserStatus(int userId, [FromBody] UpdateUserStatusDto dto, [FromHeader(Name = "X-Current-User-Id")] int? currentUserHeader, CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized(new { message = "Current user id is required." });
+        }
+
+        try
+        {
+            return Ok(await _userManagementService.UpdateUserStatusAsync(currentUserId, userId, dto, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
+
     [HttpGet("{userId:int}/effective-permissions", Name = "Get User Effective Permissions")]
     public async Task<ActionResult<List<PermissionDto>>> GetUserEffectivePermissions(int userId, [FromHeader(Name = "X-Current-User-Id")] int? currentUserHeader, CancellationToken cancellationToken)
     {
