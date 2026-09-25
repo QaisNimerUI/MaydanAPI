@@ -228,6 +228,7 @@ public class ProductionCompanyOnboardingServiceTests
         public Task<City?> GetByIdAsync(int cityId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_cityExists ? new City { Id = cityId, EnglishName = "Amman" } : null);
 
+        public Task<City?> GetByIdIncludingDeletedAsync(int cityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<City>> GetByCountryIdAsync(int countryId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task AddAsync(City city, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public void Remove(City city) => throw new NotSupportedException();

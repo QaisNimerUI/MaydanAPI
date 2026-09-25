@@ -40,6 +40,7 @@ public class MaydanDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MaydanDbContext).Assembly);
 
         ProjectTypeSeed.Seed(modelBuilder);
+        LocationSeed.Seed(modelBuilder);
 
         // Global soft-delete filter for every SharedEntities (IsDeleted set by SaveChangesAsync below).
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
