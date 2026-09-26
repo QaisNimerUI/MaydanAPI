@@ -15,6 +15,7 @@ public class UnitOfWork : IUnitOfWork
     private IProjectTypeRepository? _projectTypes;
     private ICountryRepository? _countries;
     private ICityRepository? _cities;
+    private ICityLocationRepository? _cityLocations;
     private IAssociationRepository? _associations;
     private IProductionCompanyRepository? _productionCompanies;
     private IProjectRepository? _projects;
@@ -34,6 +35,7 @@ public class UnitOfWork : IUnitOfWork
     public IGroupRepository Groups => _groups ??= new GroupRepository(_context);
     public ICountryRepository Countries => _countries ??= new CountryRepository(_context);
     public ICityRepository Cities => _cities ??= new CityRepository(_context);
+    public ICityLocationRepository CityLocations => _cityLocations ??= new CityLocationRepository(_context);
     public IAssociationRepository Associations => _associations ??= new AssociationRepository(_context);
     public IProductionCompanyRepository ProductionCompanies => _productionCompanies ??= new ProductionCompanyRepository(_context);
     public IProjectRepository Projects => _projects ??= new ProjectRepository(_context);

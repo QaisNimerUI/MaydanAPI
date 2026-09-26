@@ -21,4 +21,12 @@ public interface ILocationService
     Task<CityDto> UpdateCityAsync(int cityId, UpdateCityDto dto, int currentUserId, CancellationToken cancellationToken = default);
     Task DeleteCityAsync(int cityId, int currentUserId, CancellationToken cancellationToken = default);
     Task<CityDto> RestoreCityAsync(int cityId, int currentUserId, CancellationToken cancellationToken = default);
+
+    // MAYD-51 Phase 2d: CityLocations, the third and last tier of this same feature — see
+    // LocationService's own CityLocation method comments for the rest of the story.
+    Task<List<CityLocationDto>> GetCityLocationsByCityAsync(int cityId, CancellationToken cancellationToken = default);
+    Task<CityLocationDto> CreateCityLocationAsync(CreateCityLocationDto dto, int currentUserId, CancellationToken cancellationToken = default);
+    Task<CityLocationDto> UpdateCityLocationAsync(UpdateCityLocationDto dto, int currentUserId, CancellationToken cancellationToken = default);
+    Task DeleteCityLocationAsync(int cityLocationId, int currentUserId, CancellationToken cancellationToken = default);
+    Task<CityLocationDto> RestoreCityLocationAsync(int cityLocationId, int currentUserId, CancellationToken cancellationToken = default);
 }
