@@ -17,6 +17,7 @@ public class UnitOfWork : IUnitOfWork
     private ICityRepository? _cities;
     private ICityLocationRepository? _cityLocations;
     private IAssociationRepository? _associations;
+    private IAssociationProjectSupervisorRepository? _associationProjectSupervisors;
     private IProductionCompanyRepository? _productionCompanies;
     private IProjectRepository? _projects;
     private IWorkerRepository? _workers;
@@ -37,6 +38,7 @@ public class UnitOfWork : IUnitOfWork
     public ICityRepository Cities => _cities ??= new CityRepository(_context);
     public ICityLocationRepository CityLocations => _cityLocations ??= new CityLocationRepository(_context);
     public IAssociationRepository Associations => _associations ??= new AssociationRepository(_context);
+    public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => _associationProjectSupervisors ??= new AssociationProjectSupervisorRepository(_context);
     public IProductionCompanyRepository ProductionCompanies => _productionCompanies ??= new ProductionCompanyRepository(_context);
     public IProjectRepository Projects => _projects ??= new ProjectRepository(_context);
     public IWorkerRepository Workers => _workers ??= new WorkerRepository(_context);

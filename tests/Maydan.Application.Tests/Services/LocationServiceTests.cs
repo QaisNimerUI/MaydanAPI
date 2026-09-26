@@ -532,6 +532,7 @@ public class LocationServiceTests
         public ICountryRepository Countries { get; }
         public ICityRepository Cities { get; }
         public ICityLocationRepository CityLocations { get; }
+        public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => throw new NotSupportedException();
         public IRoleRepository Roles => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
         public IGroupRepository Groups => throw new NotSupportedException();

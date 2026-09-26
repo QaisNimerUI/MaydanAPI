@@ -256,6 +256,7 @@ public class ProductionCompanyOnboardingServiceTests
         public IRoleRepository Roles { get; }
         public ICityRepository Cities { get; }
         public ICityLocationRepository CityLocations => throw new NotSupportedException();
+        public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
         public IGroupRepository Groups => throw new NotSupportedException();
         public IProjectTypeRepository ProjectTypes => throw new NotSupportedException();

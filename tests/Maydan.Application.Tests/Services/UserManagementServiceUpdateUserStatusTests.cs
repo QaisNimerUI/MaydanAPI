@@ -218,6 +218,7 @@ public class UserManagementServiceUpdateUserStatusTests
         public ICountryRepository Countries => throw new NotSupportedException();
         public ICityRepository Cities => throw new NotSupportedException();
         public ICityLocationRepository CityLocations => throw new NotSupportedException();
+        public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => throw new NotSupportedException();
         public IAssociationRepository Associations => throw new NotSupportedException();
         public IProductionCompanyRepository ProductionCompanies => throw new NotSupportedException();
         public IProjectRepository Projects => throw new NotSupportedException();

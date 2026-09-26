@@ -11,6 +11,7 @@ public interface IUnitOfWork
     ICityRepository Cities { get; }
     ICityLocationRepository CityLocations { get; }
     IAssociationRepository Associations { get; }
+    IAssociationProjectSupervisorRepository AssociationProjectSupervisors { get; }
     IProductionCompanyRepository ProductionCompanies { get; }
     IProjectRepository Projects { get; }
     IWorkerRepository Workers { get; }

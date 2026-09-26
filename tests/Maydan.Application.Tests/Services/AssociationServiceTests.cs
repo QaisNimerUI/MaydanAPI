@@ -576,6 +576,7 @@ public class AssociationServiceTests
         public IAssociationRepository Associations => _associations;
         public ICityRepository Cities { get; }
         public ICityLocationRepository CityLocations => throw new NotSupportedException();
+        public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => throw new NotSupportedException();
         public IWorkerRepository Workers => _workers;
         public IRoleRepository Roles => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
