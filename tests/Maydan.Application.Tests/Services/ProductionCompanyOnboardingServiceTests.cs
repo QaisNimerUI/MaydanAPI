@@ -136,6 +136,23 @@ public class ProductionCompanyOnboardingServiceTests
     }
 
     [Fact]
+    public async Task RegisterAsync_DuplicateEnglishName_ThrowsAndCreatesNothing()
+    {
+        // MAYD-79 gap fix: CompanyNameEn ("must be unique" per the ticket's own text) had no
+        // uniqueness check at all before this phase — only Email and RegistrationNumber did.
+        var userRepository = new FakeUserRepository();
+        var companyRepository = new FakeProductionCompanyRepository(englishNameExists: true);
+        var unitOfWork = new FakeUnitOfWork(userRepository, companyRepository, new FakeRoleRepository(ProductionHouseRoleWithPermissions()), new FakeCityRepository(cityExists: true));
+        var service = new ProductionCompanyOnboardingService(unitOfWork, new FakePasswordHasher());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RegisterAsync(ValidDto()));
+
+        Assert.Contains("English name", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(companyRepository.AddedCompany);
+        Assert.Null(userRepository.AddedUser);
+    }
+
+    [Fact]
     public async Task RegisterAsync_CityNotFound_ThrowsAndCreatesNothing()
     {
         var userRepository = new FakeUserRepository();
@@ -184,13 +201,21 @@ public class ProductionCompanyOnboardingServiceTests
     private sealed class FakeProductionCompanyRepository : IProductionCompanyRepository
     {
         private readonly bool _registrationNumberExists;
+        private readonly bool _englishNameExists;
 
-        public FakeProductionCompanyRepository(bool registrationNumberExists = false) => _registrationNumberExists = registrationNumberExists;
+        public FakeProductionCompanyRepository(bool registrationNumberExists = false, bool englishNameExists = false)
+        {
+            _registrationNumberExists = registrationNumberExists;
+            _englishNameExists = englishNameExists;
+        }
 
         public ProductionCompany? AddedCompany { get; private set; }
 
         public Task<bool> RegistrationNumberExistsAsync(string registrationNumber, CancellationToken cancellationToken = default) =>
             Task.FromResult(_registrationNumberExists);
+
+        public Task<bool> EnglishNameExistsAsync(string englishName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_englishNameExists);
 
         public Task AddAsync(ProductionCompany productionCompany, CancellationToken cancellationToken = default)
         {
@@ -201,6 +226,7 @@ public class ProductionCompanyOnboardingServiceTests
 
         public Task<ProductionCompany?> GetByIdAsync(int productionCompanyId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<ProductionCompany>> GetAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<ProductionCompany>> QueryAsync(bool isDeleted, string? searchTerm = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public void Remove(ProductionCompany productionCompany) => throw new NotSupportedException();
     }
 

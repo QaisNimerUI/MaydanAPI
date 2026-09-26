@@ -15,13 +15,37 @@ public class ProductionCompanyRepository : IProductionCompanyRepository
     }
 
     public Task<ProductionCompany?> GetByIdAsync(int productionCompanyId, CancellationToken cancellationToken = default) =>
-        _context.ProductionCompanies.FirstOrDefaultAsync(p => p.Id == productionCompanyId, cancellationToken);
+        _context.ProductionCompanies
+            .Include(p => p.City).ThenInclude(c => c.Country)
+            .FirstOrDefaultAsync(p => p.Id == productionCompanyId, cancellationToken);
 
     public Task<List<ProductionCompany>> GetAllAsync(CancellationToken cancellationToken = default) =>
         _context.ProductionCompanies.ToListAsync(cancellationToken);
 
     public Task<bool> RegistrationNumberExistsAsync(string registrationNumber, CancellationToken cancellationToken = default) =>
         _context.ProductionCompanies.AnyAsync(p => p.RegistrationNumber == registrationNumber, cancellationToken);
+
+    public Task<bool> EnglishNameExistsAsync(string englishName, CancellationToken cancellationToken = default) =>
+        _context.ProductionCompanies.AnyAsync(p => p.EnglishName == englishName, cancellationToken);
+
+    public Task<List<ProductionCompany>> QueryAsync(bool isDeleted, string? searchTerm = null, CancellationToken cancellationToken = default)
+    {
+        IQueryable<ProductionCompany> query = isDeleted
+            ? _context.ProductionCompanies.IgnoreQueryFilters().Where(p => p.IsDeleted)
+            : _context.ProductionCompanies;
+
+        query = query
+            .AsNoTracking()
+            .Include(p => p.City).ThenInclude(c => c.Country);
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.Trim();
+            query = query.Where(p => p.EnglishName.Contains(term) || p.ArabicName.Contains(term));
+        }
+
+        return query.OrderBy(p => p.EnglishName).ToListAsync(cancellationToken);
+    }
 
     public async Task AddAsync(ProductionCompany productionCompany, CancellationToken cancellationToken = default) =>
         await _context.ProductionCompanies.AddAsync(productionCompany, cancellationToken);

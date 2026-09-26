@@ -46,6 +46,15 @@ public class ProductionCompanyOnboardingService : IProductionCompanyOnboardingSe
             throw new InvalidOperationException("A production company with this registration number is already registered.");
         }
 
+        // MAYD-79 gap fix: the ticket's own text requires CompanyNameEn to be unique, same as
+        // RegistrationNumber — this check never existed until now (confirmed by reading this
+        // method before the fix; only Email and RegistrationNumber were ever checked).
+        var companyNameEn = dto.CompanyNameEn.Trim();
+        if (await _unitOfWork.ProductionCompanies.EnglishNameExistsAsync(companyNameEn, cancellationToken))
+        {
+            throw new InvalidOperationException("A production company with this English name is already registered.");
+        }
+
         if (await _unitOfWork.Cities.GetByIdAsync(dto.CityId, cancellationToken) is null)
         {
             throw new KeyNotFoundException("City was not found.");
@@ -66,7 +75,7 @@ public class ProductionCompanyOnboardingService : IProductionCompanyOnboardingSe
 
         var company = new ProductionCompany
         {
-            EnglishName = dto.CompanyNameEn.Trim(),
+            EnglishName = companyNameEn,
             ArabicName = dto.CompanyNameAr.Trim(),
             RegistrationNumber = registrationNumber,
             CityId = dto.CityId,
