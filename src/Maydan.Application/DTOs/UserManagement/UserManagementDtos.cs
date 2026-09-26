@@ -94,6 +94,12 @@ public class CreateEntityUserDto
     public int RoleId { get; set; }
     public List<int> PermissionIds { get; set; } = new();
     public List<int> GroupIds { get; set; } = new();
+
+    // Association Management, Phase 2b: optional real-association override for a cross-entity
+    // Association-role create (Bayt-AlUrdon only — see EnsureSameEntityCreation). Null (every
+    // existing caller, and every non-Association-role create) keeps the exact prior placeholder-1
+    // behavior — see UserManagementService.ResolveEntityForRoleAsync's own comment.
+    public int? EntityId { get; set; }
 }
 
 public class CreateGroupDto
