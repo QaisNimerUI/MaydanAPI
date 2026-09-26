@@ -240,6 +240,9 @@ public class EntityOnboardingServiceTests
 
         public Task AddAsync(Association association, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public void Remove(Association association) => throw new NotSupportedException();
+        public Task<Association?> GetByIdIncludingDeletedAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<(Association Association, int WorkersCount)?> GetByIdWithWorkersCountAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<(Association Association, int WorkersCount)>> QueryAsync(bool isDeleted, string? searchTerm = null, bool? orderByWorkersCountAscending = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeRoleRepository : IRoleRepository

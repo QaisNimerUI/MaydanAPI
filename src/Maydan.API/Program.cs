@@ -52,6 +52,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<ILocationService, LocationService>();
+builder.Services.AddScoped<IAssociationService, AssociationService>();
 builder.Services.AddScoped<IProductionCompanyOnboardingService, ProductionCompanyOnboardingService>();
 builder.Services.AddScoped<IEntityOnboardingService, EntityOnboardingService>();
 builder.Services.AddScoped<IFrontendLinkBuilder, FrontendLinkBuilder>();
