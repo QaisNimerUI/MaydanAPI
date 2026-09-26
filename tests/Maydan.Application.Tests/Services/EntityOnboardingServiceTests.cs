@@ -185,6 +185,8 @@ public class EntityOnboardingServiceTests
         public Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default) =>
             Task.FromResult(_existingEntityUsers);
 
+        public Task<List<User>> GetDeletedByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<(List<User> Users, int TotalCount)> GetPagedByEntityAsync(EntityType entityType, int entityId, string? search, bool? isActive, int page, int pageSize, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
@@ -241,6 +243,7 @@ public class EntityOnboardingServiceTests
         public Task AddAsync(Association association, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public void Remove(Association association) => throw new NotSupportedException();
         public Task<Association?> GetByIdIncludingDeletedAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Association?> GetByIdWithWorkersAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<(Association Association, int WorkersCount)?> GetByIdWithWorkersCountAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<(Association Association, int WorkersCount)>> QueryAsync(bool isDeleted, string? searchTerm = null, bool? orderByWorkersCountAscending = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }

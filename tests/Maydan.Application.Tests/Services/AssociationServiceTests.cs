@@ -32,7 +32,7 @@ public class AssociationServiceTests
         return role;
     }
 
-    private static User BuildUser(int userId, Role role, bool isActive = true) => new()
+    private static User BuildUser(int userId, Role role, bool isActive = true, EntityType entityType = EntityType.BaytAlUrdon, int entityId = 1, bool isDeleted = false, DateTime? deletedAt = null) => new()
     {
         UserId = userId,
         FirstNameEn = $"First{userId}",
@@ -41,9 +41,11 @@ public class AssociationServiceTests
         LastNameAr = $"اخير{userId}",
         RoleId = role.RoleId,
         Role = role,
-        EntityType = EntityType.BaytAlUrdon,
-        EntityId = 1,
-        IsActive = isActive
+        EntityType = entityType,
+        EntityId = entityId,
+        IsActive = isActive,
+        IsDeleted = isDeleted,
+        DeletedAt = deletedAt
     };
 
     private static Country BuildCountry(int id) => new() { Id = id, EnglishName = "Jordan", ArabicName = "الأردن", IsActive = true };
@@ -58,6 +60,15 @@ public class AssociationServiceTests
         CityId = city.Id,
         City = city,
         IsDeleted = isDeleted,
+        IsActive = true
+    };
+
+    private static Worker BuildWorker(int id, int associationId, bool isDeleted = false, DateTime? deletedAt = null) => new()
+    {
+        Id = id,
+        AssociationId = associationId,
+        IsDeleted = isDeleted,
+        DeletedAt = deletedAt,
         IsActive = true
     };
 
@@ -232,23 +243,146 @@ public class AssociationServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.RestoreAsync(caller.UserId, 10));
     }
 
+    [Fact]
+    public async Task DeleteAsync_CascadesToRealUsersAndWorkers_SoftDeletesAllWithTheSameDeletedAt()
+    {
+        var caller = BuildUser(1, BuildRole(1, "Deleter", DeleteAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(1, country);
+        var association = BuildAssociation(10, city);
+        var associationUser = BuildUser(2, BuildRole(2, "AssocUser"), entityType: EntityType.Association, entityId: 10);
+        var worker = BuildWorker(100, associationId: 10);
+        var (service, _) = BuildServiceWithRepository(caller, [association], [city], [associationUser], [worker]);
+
+        await service.DeleteAsync(caller.UserId, 10);
+
+        Assert.True(association.IsDeleted);
+        Assert.True(associationUser.IsDeleted);
+        Assert.True(worker.IsDeleted);
+        Assert.NotNull(association.DeletedAt);
+        // MaydanDbContext.SaveChangesAsync computes utcNow ONCE per call and stamps every entity
+        // staged for removal in it with that same instant — this is the exact real mechanic
+        // RestoreAsync's own cascade depends on to tell "deleted in this cascade" apart from
+        // "deleted independently" (see RestoreAsync_OnlyRestoresRowsDeletedInTheSameCascade below).
+        Assert.Equal(association.DeletedAt, associationUser.DeletedAt);
+        Assert.Equal(association.DeletedAt, worker.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithExistingWorkers_DoesNotBlockDeletion()
+    {
+        // The ticket's own explicit requirement: "the existence of workers must not prevent the
+        // association from being deleted" — was already true before this phase (no blocking check
+        // ever existed); this proves it still holds once the cascade itself is added.
+        var caller = BuildUser(1, BuildRole(1, "Deleter", DeleteAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(1, country);
+        var association = BuildAssociation(10, city);
+        var worker = BuildWorker(100, associationId: 10);
+        var (service, _) = BuildServiceWithRepository(caller, [association], [city], users: null, workers: [worker]);
+
+        await service.DeleteAsync(caller.UserId, 10);
+
+        Assert.True(association.IsDeleted);
+        Assert.True(worker.IsDeleted);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithNoUsersOrWorkers_SucceedsWithoutError()
+    {
+        var caller = BuildUser(1, BuildRole(1, "Deleter", DeleteAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(1, country);
+        var association = BuildAssociation(10, city);
+        var (service, _) = BuildServiceWithRepository(caller, [association], [city], users: null, workers: null);
+
+        await service.DeleteAsync(caller.UserId, 10);
+
+        Assert.True(association.IsDeleted);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_OnlyRestoresRowsDeletedInTheSameCascade()
+    {
+        var caller = BuildUser(1, BuildRole(1, "Deleter", DeleteAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(1, country);
+        var association = BuildAssociation(10, city);
+
+        // Independently deleted BEFORE the association's own cascade, for an unrelated reason, but
+        // scoped to the SAME association — the real case this design protects against. Both are
+        // already IsDeleted when DeleteAsync's cascade below runs, so the active-only
+        // GetByEntityAsync/GetByAssociationIdAsync queries never touch them (they're not
+        // re-soft-deleted, and their own DeletedAt is left completely alone by DeleteAsync).
+        var independentDeletedAt = DateTime.UtcNow.AddMinutes(-30);
+        var independentUser = BuildUser(3, BuildRole(3, "AssocUser"), entityType: EntityType.Association, entityId: 10, isDeleted: true, deletedAt: independentDeletedAt);
+        var independentWorker = BuildWorker(200, associationId: 10, isDeleted: true, deletedAt: independentDeletedAt);
+
+        var associationUser = BuildUser(2, BuildRole(2, "AssocUser"), entityType: EntityType.Association, entityId: 10);
+        var worker = BuildWorker(100, associationId: 10);
+
+        var (service, _) = BuildServiceWithRepository(caller, [association], [city], [associationUser, independentUser], [worker, independentWorker]);
+
+        await service.DeleteAsync(caller.UserId, 10);
+
+        var result = await service.RestoreAsync(caller.UserId, 10);
+
+        Assert.False(result.IsDeleted);
+        Assert.False(association.IsDeleted);
+        Assert.False(associationUser.IsDeleted);
+        Assert.Null(associationUser.DeletedAt);
+        Assert.False(worker.IsDeleted);
+        Assert.Null(worker.DeletedAt);
+
+        // The independently-deleted rows must be completely untouched by the restore.
+        Assert.True(independentUser.IsDeleted);
+        Assert.Equal(independentDeletedAt, independentUser.DeletedAt);
+        Assert.True(independentWorker.IsDeleted);
+        Assert.Equal(independentDeletedAt, independentWorker.DeletedAt);
+    }
+
     private static AssociationService BuildService(User caller, Association[]? associations = null, City[]? cities = null) =>
         BuildServiceWithRepository(caller, associations, cities).Service;
 
-    private static (AssociationService Service, FakeAssociationRepository Repository) BuildServiceWithRepository(User caller, Association[]? associations = null, City[]? cities = null)
+    private static (AssociationService Service, FakeAssociationRepository Repository) BuildServiceWithRepository(User caller, Association[]? associations = null, City[]? cities = null) =>
+        BuildServiceWithRepository(caller, associations, cities, users: null, workers: null);
+
+    private static (AssociationService Service, FakeAssociationRepository Repository) BuildServiceWithRepository(
+        User caller, Association[]? associations, City[]? cities, User[]? users, Worker[]? workers)
     {
-        var userRepository = new FakeUserRepository(caller);
-        var associationRepository = new FakeAssociationRepository(associations ?? [], cities ?? []);
+        // MAYD-51 cascade users/workers passed here are on top of the caller — the caller themselves
+        // is looked up separately via GetByIdAsync/GetWithPermissionsAsync (see FakeUserRepository),
+        // never through GetByEntityAsync, matching the real UserRepository's own separation.
+        var userRepository = new FakeUserRepository(caller, users);
+        var workerRepository = new FakeWorkerRepository(workers);
+        // Same Worker instances handed to FakeWorkerRepository above — GetByIdWithWorkersAsync below
+        // filters this same backing list down to the association's own active workers, exactly
+        // mirroring EF's Include() + global soft-delete filter, so Remove()ing a worker reached via
+        // association.Workers stages the SAME tracked instance FakeWorkerRepository will commit.
+        var associationRepository = new FakeAssociationRepository(associations ?? [], cities ?? [], workers);
         var cityRepository = new FakeCityRepository(cities ?? []);
 
-        var unitOfWork = new FakeUnitOfWork(userRepository, associationRepository, cityRepository);
+        var unitOfWork = new FakeUnitOfWork(userRepository, associationRepository, cityRepository, workerRepository);
         return (new AssociationService(unitOfWork), associationRepository);
     }
 
+    // MAYD-51: the pending-removal + CommitPendingRemovals(utcNow) split below (also used by
+    // FakeWorkerRepository and FakeAssociationRepository) simulates
+    // MaydanDbContext.SaveChangesAsync's real interceptor precisely — utcNow is computed ONCE by
+    // FakeUnitOfWork.SaveChangesAsync and applied to every entity Removed since the last save, not
+    // once per Remove() call — so a real test can assert cascade-mates share the exact same
+    // DeletedAt instant, exactly like the production interceptor guarantees.
     private sealed class FakeUserRepository : IUserRepository
     {
         private readonly User _currentUser;
-        public FakeUserRepository(User currentUser) => _currentUser = currentUser;
+        private readonly List<User> _users;
+        private readonly List<User> _pendingRemovals = new();
+
+        public FakeUserRepository(User currentUser, IEnumerable<User>? users = null)
+        {
+            _currentUser = currentUser;
+            _users = (users ?? Enumerable.Empty<User>()).ToList();
+        }
 
         public Task<User?> GetByIdAsync(int userId, CancellationToken cancellationToken = default) =>
             Task.FromResult(userId == _currentUser.UserId ? _currentUser : null);
@@ -256,8 +390,26 @@ public class AssociationServiceTests
         public Task<User?> GetWithPermissionsAsync(int userId, CancellationToken cancellationToken = default) =>
             Task.FromResult(userId == _currentUser.UserId ? _currentUser : null);
 
+        public Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_users.Where(u => !u.IsDeleted && u.EntityType == entityType && u.EntityId == entityId).ToList());
+
+        public Task<List<User>> GetDeletedByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_users.Where(u => u.IsDeleted && u.EntityType == entityType && u.EntityId == entityId).ToList());
+
+        public void Remove(User user) => _pendingRemovals.Add(user);
+
+        public void CommitPendingRemovals(DateTime utcNow)
+        {
+            foreach (var user in _pendingRemovals)
+            {
+                user.IsDeleted = true;
+                user.DeletedAt = utcNow;
+            }
+
+            _pendingRemovals.Clear();
+        }
+
         public Task<User?> GetByEmailWithAccessAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetDetailsAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetDetailsReadOnlyAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -266,7 +418,37 @@ public class AssociationServiceTests
         public Task<List<User>> GetByIdsInEntityAsync(IEnumerable<int> userIds, EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<(List<User> Users, int TotalCount)> GetPagedByEntityAsync(EntityType entityType, int entityId, string? search, bool? isActive, int page, int pageSize, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task AddAsync(User user, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public void Remove(User user) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeWorkerRepository : IWorkerRepository
+    {
+        private readonly List<Worker> _workers;
+        private readonly List<Worker> _pendingRemovals = new();
+
+        public FakeWorkerRepository(IEnumerable<Worker>? workers = null) => _workers = (workers ?? Enumerable.Empty<Worker>()).ToList();
+
+        public Task<List<Worker>> GetByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_workers.Where(w => !w.IsDeleted && w.AssociationId == associationId).ToList());
+
+        public Task<List<Worker>> GetDeletedByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_workers.Where(w => w.IsDeleted && w.AssociationId == associationId).ToList());
+
+        public void Remove(Worker worker) => _pendingRemovals.Add(worker);
+
+        public void CommitPendingRemovals(DateTime utcNow)
+        {
+            foreach (var worker in _pendingRemovals)
+            {
+                worker.IsDeleted = true;
+                worker.DeletedAt = utcNow;
+            }
+
+            _pendingRemovals.Clear();
+        }
+
+        public Task<Worker?> GetByIdAsync(int workerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Worker?> GetByCivilIdHashAsync(string civilIdHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task AddAsync(Worker worker, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeCityRepository : ICityRepository
@@ -283,17 +465,18 @@ public class AssociationServiceTests
         public void Remove(City city) => throw new NotSupportedException();
     }
 
-    // Remove() flips IsDeleted directly, same simulated soft-delete as every other fake repository
-    // in this test project (there's no real change-tracking pipeline here to intercept it for us).
     private sealed class FakeAssociationRepository : IAssociationRepository
     {
         private readonly Dictionary<int, Association> _associationsById;
         private readonly Dictionary<int, City> _citiesById;
+        private readonly List<Worker> _workers;
+        private readonly List<Association> _pendingRemovals = new();
 
-        public FakeAssociationRepository(IEnumerable<Association> associations, IEnumerable<City>? cities = null)
+        public FakeAssociationRepository(IEnumerable<Association> associations, IEnumerable<City>? cities = null, IEnumerable<Worker>? workers = null)
         {
             _associationsById = associations.ToDictionary(a => a.Id);
             _citiesById = (cities ?? Enumerable.Empty<City>()).ToDictionary(c => c.Id);
+            _workers = (workers ?? Enumerable.Empty<Worker>()).ToList();
         }
 
         public Association? RemovedAssociation { get; private set; }
@@ -306,6 +489,22 @@ public class AssociationServiceTests
 
         public Task<Association?> GetByIdIncludingDeletedAsync(int associationId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_associationsById.GetValueOrDefault(associationId));
+
+        // MAYD-51: mirrors AssociationRepository.GetByIdWithWorkersAsync's real Include(a =>
+        // a.Workers) — populates the SAME Worker instances FakeWorkerRepository owns (filtered to
+        // this association, active-only, exactly like the global soft-delete filter applied to an
+        // Included collection), so DeleteAsync's cascade removes the identical tracked objects.
+        public Task<Association?> GetByIdWithWorkersAsync(int associationId, CancellationToken cancellationToken = default)
+        {
+            var association = _associationsById.GetValueOrDefault(associationId);
+            if (association is not { IsDeleted: false })
+            {
+                return Task.FromResult<Association?>(null);
+            }
+
+            association.Workers = _workers.Where(w => !w.IsDeleted && w.AssociationId == associationId).ToList();
+            return Task.FromResult<Association?>(association);
+        }
 
         public Task<(Association Association, int WorkersCount)?> GetByIdWithWorkersCountAsync(int associationId, CancellationToken cancellationToken = default)
         {
@@ -344,25 +543,39 @@ public class AssociationServiceTests
             return Task.CompletedTask;
         }
 
-        public void Remove(Association association)
+        public void Remove(Association association) => _pendingRemovals.Add(association);
+
+        public void CommitPendingRemovals(DateTime utcNow)
         {
-            association.IsDeleted = true;
-            RemovedAssociation = association;
+            foreach (var association in _pendingRemovals)
+            {
+                association.IsDeleted = true;
+                association.DeletedAt = utcNow;
+                RemovedAssociation = association;
+            }
+
+            _pendingRemovals.Clear();
         }
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork
     {
-        public FakeUnitOfWork(IUserRepository users, IAssociationRepository associations, ICityRepository cities)
+        private readonly FakeUserRepository _users;
+        private readonly FakeAssociationRepository _associations;
+        private readonly FakeWorkerRepository _workers;
+
+        public FakeUnitOfWork(FakeUserRepository users, FakeAssociationRepository associations, ICityRepository cities, FakeWorkerRepository? workers = null)
         {
-            Users = users;
-            Associations = associations;
+            _users = users;
+            _associations = associations;
+            _workers = workers ?? new FakeWorkerRepository();
             Cities = cities;
         }
 
-        public IUserRepository Users { get; }
-        public IAssociationRepository Associations { get; }
+        public IUserRepository Users => _users;
+        public IAssociationRepository Associations => _associations;
         public ICityRepository Cities { get; }
+        public IWorkerRepository Workers => _workers;
         public IRoleRepository Roles => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
         public IGroupRepository Groups => throw new NotSupportedException();
@@ -370,12 +583,22 @@ public class AssociationServiceTests
         public ICountryRepository Countries => throw new NotSupportedException();
         public IProductionCompanyRepository ProductionCompanies => throw new NotSupportedException();
         public IProjectRepository Projects => throw new NotSupportedException();
-        public IWorkerRepository Workers => throw new NotSupportedException();
         public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
         public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
         public ISystemConfigurationRepository SystemConfigurations => throw new NotSupportedException();
 
-        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
+        // Mirrors MaydanDbContext.SaveChangesAsync's own interceptor: ONE utcNow computed per call,
+        // applied to every entity Removed (across all three fakes) since the last save — see the
+        // comment on FakeUserRepository for why this precision matters to the cascade tests.
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            var utcNow = DateTime.UtcNow;
+            _associations.CommitPendingRemovals(utcNow);
+            _users.CommitPendingRemovals(utcNow);
+            _workers.CommitPendingRemovals(utcNow);
+            return Task.FromResult(1);
+        }
+
         public Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default) => operation();
     }
 }

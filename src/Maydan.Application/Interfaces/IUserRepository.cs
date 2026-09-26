@@ -27,6 +27,15 @@ public interface IUserRepository
     Task<User?> GetWithPermissionsAsync(int userId, CancellationToken cancellationToken = default);
     Task<List<User>> GetByIdsInEntityAsync(IEnumerable<int> userIds, EntityType entityType, int entityId, CancellationToken cancellationToken = default);
 
+    // MAYD-51 (Association Management, Phase 2c): the mirror image of GetByEntityAsync above —
+    // SOFT-DELETED rows only (IgnoreQueryFilters + an explicit IsDeleted check), not the active-only
+    // default every other caller of GetByEntityAsync relies on. Needed by
+    // AssociationService.RestoreAsync's own cascade to find the real Users a cascade-delete touched,
+    // so it can compare each one's DeletedAt against the Association's own and restore only the ones
+    // deleted in that SAME cascade (see that method's own comment) — a User independently deleted
+    // for an unrelated reason must not be silently revived.
+    Task<List<User>> GetDeletedByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default);
+
     Task AddAsync(User user, CancellationToken cancellationToken = default);
     void Remove(User user);
 }

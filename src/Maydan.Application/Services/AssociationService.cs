@@ -2,6 +2,7 @@ using System.Globalization;
 using Maydan.Application.DTOs.Associations;
 using Maydan.Application.Interfaces;
 using Maydan.Domain.Entities;
+using Maydan.Domain.Enums;
 
 namespace Maydan.Application.Services;
 
@@ -14,11 +15,15 @@ namespace Maydan.Application.Services;
 // Deliberately NOT built here (see this pass's own completion report for the full list): Association
 // admin-creation (already exists — EntityOnboardingController's associations/without-admin +
 // associations/{id}/admin, built during the onboarding phase; do not duplicate it), AssociationUsers
-// linking (Phase 2b — no AssociationUser entity exists yet), cascading delete to Workers/AssociationUsers
-// on Association delete (MAYD-51 — a separate business-rule decision, not resolved here, see
-// DeleteAsync's own comment), CityLocations (a later phase — Association has no CityLocationId column;
-// see AssociationDto's own comment), and the Service-Request-based edit/delete restriction (MAYD-48/50 —
-// no ServiceRequest module exists anywhere in this codebase yet, confirmed by grep).
+// linking (Phase 2b — no AssociationUser entity exists yet; Phase 2c's own investigation confirmed
+// "users associated with an association" are simply real User rows with EntityType.Association +
+// EntityId == association.Id, Phase 2b's own real wiring), CityLocations (a later phase — Association
+// has no CityLocationId column; see AssociationDto's own comment), and the Service-Request-based
+// edit/delete restriction (MAYD-48/50 — no ServiceRequest module exists anywhere in this codebase
+// yet, confirmed by grep).
+//
+// MAYD-51 (Association Management, Phase 2c, 2026-09-26): "Delete Associated Users & Workers" — see
+// DeleteAsync/RestoreAsync's own comments for the cascade this phase adds.
 public class AssociationService : IAssociationService
 {
     private const int MaxNameLength = 200;
@@ -146,24 +151,70 @@ public class AssociationService : IAssociationService
         return await MapExistingAsync(association.Id, cancellationToken);
     }
 
-    // Phase 2a scope (MAYD-51 is a deliberately separate design discussion, not resolved here): this
-    // is a PLAIN soft-delete of the Association record only. It does NOT cascade to Workers and does
-    // NOT touch association-linked users — there is no AssociationUser entity yet (Phase 2b), and
-    // whether deleting an association should also delete its workers/users at all is MAYD-51's own
-    // open business-rule question, not something to guess an answer to in this pass. A deleted
-    // Association's Workers rows are simply left as-is, still pointing at a now-soft-deleted
-    // AssociationId — revisit once MAYD-51 is actually decided.
+    // MAYD-51 ("Delete Associated Users & Workers"): cascades the same soft-delete to every real
+    // User/Worker row scoped to this Association — "users associated with an association" are real
+    // User rows with EntityType.Association + EntityId == association.Id (Phase 2b's own real
+    // wiring; no separate AssociationUser link entity exists), reusing GetByEntityAsync exactly as
+    // UserManagementService.GetUsersAsync/CreateUserAsync already do; "workers associated with an
+    // association" come from the SAME tracked Association.Workers collection loaded by
+    // GetByIdWithWorkersAsync below (see that method's own comment on IAssociationRepository for
+    // why — a required, Restrict-behavior Worker->Association relationship needs the collection
+    // actually loaded before both sides can be marked deleted in the same SaveChanges call). Both
+    // sources respect the global soft-delete filter (active-only, automatically for the Included
+    // collection too), so every row here is guaranteed not already deleted — no extra IsDeleted
+    // check needed before staging each Remove().
+    //
+    // The ticket's own explicit requirement ("existence of workers must not prevent deletion") was
+    // already true before this phase — DeleteAsync never had an existence check blocking it; this
+    // only ADDS the cascade, it doesn't remove a block that was never there.
+    //
+    // This does NOT re-check Manage Users/Manage Workers for the caller — deleting an association is
+    // one authorized action (DeleteAssociations/ManageAssociations, checked once above), not a
+    // proxy for independently re-authorizing bulk user/worker management.
     public async Task DeleteAsync(int currentUserId, int associationId, CancellationToken cancellationToken = default)
     {
         await GetAuthorizedUserAsync(currentUserId, DeleteAssociationsPermissionId, cancellationToken);
 
-        var association = await _unitOfWork.Associations.GetByIdAsync(associationId, cancellationToken)
+        var association = await _unitOfWork.Associations.GetByIdWithWorkersAsync(associationId, cancellationToken)
             ?? throw new KeyNotFoundException("Association was not found.");
 
+        var users = await _unitOfWork.Users.GetByEntityAsync(EntityType.Association, association.Id, search: null, cancellationToken);
+
+        // Snapshot into a plain list before removing anything — Remove() below keeps the in-memory
+        // graph consistent by also removing each Worker from this same Association.Workers
+        // collection as it's marked deleted, which would otherwise invalidate a live foreach over
+        // the collection itself.
+        var workers = association.Workers.ToList();
+
         // MaydanDbContext.SaveChangesAsync intercepts EntityState.Deleted for every SharedEntities
-        // and converts it into a soft delete (IsDeleted = true, DeletedAt = UtcNow) — this does not
+        // and converts it into a soft delete (IsDeleted = true, DeletedAt = utcNow) — this does not
         // hard-delete the row (same pattern as ProjectService.DeleteAsync/LocationService.DeleteCountryAsync).
+        // Confirmed: utcNow is computed ONCE per SaveChangesAsync call and applied to every entity
+        // staged in it, not once per entity — so the Association and every cascaded User/Worker
+        // below, all Removed before the single SaveChangesAsync call that follows, get the EXACT
+        // SAME DeletedAt. RestoreAsync's own cascade relies on that same-instant equality to tell
+        // "deleted in THIS cascade" apart from "deleted independently" (see its own comment) — no
+        // separate timestamp needs to be threaded through by hand.
+        //
+        // Order matters here: the Workers (and, for consistency, Users) must be Removed BEFORE the
+        // Association itself — confirmed live. Worker->Association is a required, Restrict-behavior
+        // relationship (WorkerConfiguration.cs); marking the Association Deleted first, while its
+        // (now-loaded) Workers collection still has entries that aren't ALSO marked Deleted yet,
+        // makes EF Core's own cascade-behavior check throw ("the association between entity types
+        // 'Association' and 'Worker' has been severed...") — even though every entity ends up
+        // Removed before the single SaveChangesAsync call below. Deleting dependents first avoids it.
+        foreach (var user in users)
+        {
+            _unitOfWork.Users.Remove(user);
+        }
+
+        foreach (var worker in workers)
+        {
+            _unitOfWork.Workers.Remove(worker);
+        }
+
         _unitOfWork.Associations.Remove(association);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
@@ -182,8 +233,40 @@ public class AssociationService : IAssociationService
             throw new InvalidOperationException("Association is not deleted.");
         }
 
+        // MAYD-51 symmetric restore: MAYD-51's own text only talks about delete, but leaving
+        // DeleteAsync's cascade with no restore-side counterpart would permanently orphan a real
+        // User/Worker the moment their Association is restored — clearly wrong. Blindly restoring
+        // EVERY currently-deleted User/Worker under this AssociationId is ALSO wrong: one could have
+        // been soft-deleted independently, for an unrelated reason, before or after the
+        // Association's own deletion — reviving it just because the Association came back would be
+        // a real, silent bug. The fix: only restore a User/Worker whose own DeletedAt exactly
+        // matches THIS Association's own DeletedAt — i.e. it was deleted in the very same cascade
+        // (see DeleteAsync's own comment on why every entity in one cascade shares one identical
+        // DeletedAt instant). Captured BEFORE clearing the Association's own DeletedAt below, since
+        // that's the value being compared against.
+        var cascadeDeletedAt = association.DeletedAt;
+
+        var deletedUsers = await _unitOfWork.Users.GetDeletedByEntityAsync(EntityType.Association, association.Id, cancellationToken);
+        var deletedWorkers = await _unitOfWork.Workers.GetDeletedByAssociationIdAsync(association.Id, cancellationToken);
+
         association.IsDeleted = false;
         association.DeletedAt = null;
+
+        // Restore isn't a Remove()/interceptor-driven transition (there's no "un-delete" interception
+        // — clearing IsDeleted is a normal property update) — hand-set the same two fields the
+        // interceptor itself owns on the way down, matching how the Association's own restore above
+        // already does it, for exactly the rows whose DeletedAt matches the cascade being reversed.
+        foreach (var user in deletedUsers.Where(u => u.DeletedAt == cascadeDeletedAt))
+        {
+            user.IsDeleted = false;
+            user.DeletedAt = null;
+        }
+
+        foreach (var worker in deletedWorkers.Where(w => w.DeletedAt == cascadeDeletedAt))
+        {
+            worker.IsDeleted = false;
+            worker.DeletedAt = null;
+        }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

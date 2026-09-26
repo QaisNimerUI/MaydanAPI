@@ -147,6 +147,11 @@ public class UserRepository : IUserRepository
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<User>> GetDeletedByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) =>
+        _context.Users.IgnoreQueryFilters()
+            .Where(u => u.IsDeleted && u.EntityType == entityType && u.EntityId == entityId)
+            .ToListAsync(cancellationToken);
+
     public async Task AddAsync(User user, CancellationToken cancellationToken = default) =>
         await _context.Users.AddAsync(user, cancellationToken);
 

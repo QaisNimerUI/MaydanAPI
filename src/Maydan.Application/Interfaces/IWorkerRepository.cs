@@ -13,6 +13,12 @@ public interface IWorkerRepository
     // look a worker up by civil ID.
     Task<Worker?> GetByCivilIdHashAsync(string civilIdHash, CancellationToken cancellationToken = default);
     Task<List<Worker>> GetByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default);
+
+    // MAYD-51 (Association Management, Phase 2c): mirror of IUserRepository.GetDeletedByEntityAsync
+    // — SOFT-DELETED rows only, for AssociationService.RestoreAsync's own cascade. See that
+    // interface method's own comment for the full reasoning.
+    Task<List<Worker>> GetDeletedByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default);
+
     Task AddAsync(Worker worker, CancellationToken cancellationToken = default);
     void Remove(Worker worker);
 }

@@ -16,6 +16,18 @@ public interface IAssociationRepository
     // ICountryRepository.GetByIdIncludingDeletedAsync (Phase 1's own precedent).
     Task<Association?> GetByIdIncludingDeletedAsync(int associationId, CancellationToken cancellationToken = default);
 
+    // MAYD-51 (Association Management, Phase 2c): DeleteAsync's own cascade-delete needs the real
+    // Workers collection actually LOADED (tracked), not just separately queried — Worker.Association
+    // is a required (non-nullable FK), DeleteBehavior.Restrict navigation (WorkerConfiguration.cs).
+    // Confirmed by hitting it live: if both the Association and separately-tracked Worker rows are
+    // marked EntityState.Deleted in the same SaveChanges call while Association.Workers isn't
+    // Included, EF Core's own relationship fixup can't reconcile the two and throws ("the
+    // association between entity types 'Association' and 'Worker' has been severed..."). Loading the
+    // collection here (global soft-delete filter still applies to it automatically, same as any
+    // other Include) avoids that entirely — GetByIdAsync itself is left untouched since its other
+    // real callers (GetAllAsync's own reuse aside) have no use for the Workers collection.
+    Task<Association?> GetByIdWithWorkersAsync(int associationId, CancellationToken cancellationToken = default);
+
     // GET /api/Associations/{id} needs WorkersCount alongside the entity itself — a computed
     // COUNT(Workers WHERE AssociationId = Id) (Association.cs's own comment), not a stored column,
     // so it's carried out of the repository as a tuple rather than bolted onto the entity.

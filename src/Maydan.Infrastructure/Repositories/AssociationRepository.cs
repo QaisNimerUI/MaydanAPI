@@ -35,6 +35,12 @@ public class AssociationRepository : IAssociationRepository
             .Include(a => a.City).ThenInclude(c => c.Country)
             .FirstOrDefaultAsync(a => a.Id == associationId, cancellationToken);
 
+    public Task<Association?> GetByIdWithWorkersAsync(int associationId, CancellationToken cancellationToken = default) =>
+        _context.Associations
+            .Include(a => a.City).ThenInclude(c => c.Country)
+            .Include(a => a.Workers)
+            .FirstOrDefaultAsync(a => a.Id == associationId, cancellationToken);
+
     public async Task<(Association Association, int WorkersCount)?> GetByIdWithWorkersCountAsync(int associationId, CancellationToken cancellationToken = default)
     {
         var result = await _context.Associations
