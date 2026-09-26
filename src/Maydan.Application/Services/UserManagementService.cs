@@ -89,10 +89,10 @@ public class UserManagementService : IUserManagementService
         // Same role as the creator (the only case every role but Bayt-AlUrdon can ever reach, per
         // EnsureSameEntityCreation above) keeps the exact prior behavior: the new user belongs to the
         // creator's own entity. Only Bayt-AlUrdon creating a DIFFERENT role reaches the resolved
-        // branch — see ResolveEntityForRole's own comment.
+        // branch — see ResolveEntityForRoleAsync's own comment.
         var (targetEntityType, targetEntityId) = role.RoleId == currentUser.RoleId
             ? (currentUser.EntityType, currentUser.EntityId)
-            : ResolveEntityForRole(role.RoleId);
+            : await ResolveEntityForRoleAsync(role.RoleId, dto.EntityId, cancellationToken);
 
         var groupIds = NormalizeIds(dto.GroupIds);
         var groups = await EnsureGroupsInEntityAsync(groupIds, targetEntityType, targetEntityId, cancellationToken);
@@ -498,14 +498,43 @@ public class UserManagementService : IUserManagementService
     // DB (see UserSeedConfiguration.cs's own comments: zero real Association/ProductionCompany rows
     // exist yet, a separate already-flagged gap), since there is no real entity-instance picker (or
     // data to pick from) for this ticket to build.
-    private static (EntityType EntityType, int EntityId) ResolveEntityForRole(int roleId) => roleId switch
+    // Association Management, Phase 2b (2026-09-26): the real gap this closes wasn't "AssociationUsers
+    // linking" (that screen — workforcment's AssociationUsersComponent — was already deprecated by
+    // its own author, MAYD-21 scope explicitly excludes it) but this: every Association-role user
+    // ever created — every seed row, and every cross-entity create through this exact method — has
+    // landed on EntityId = 1, a placeholder, because until Phase 2a there were no real Association
+    // rows to reference (see UserSeedConfiguration.cs's own comments). The one path that already did
+    // this right, EntityOnboardingService's admin-creation flow, sets EntityId = association.Id
+    // because it always has a real, already-resolved Association in hand — this brings the SAME
+    // real-id behavior to this method's own cross-entity Association-role branch, opt-in via
+    // requestedEntityId so every other caller (every non-Association role, and any Association-role
+    // create that doesn't pass it) is completely unaffected.
+    //
+    // requestedEntityId is validated against a real, non-deleted Association (GetByIdAsync is
+    // already soft-delete-filtered — same pattern AssociationService.EnsureCityExistsAsync uses for
+    // its own City FK) rather than trusted blindly. BaytAlUrdon/Aseza/ProductionHouse ignore it
+    // entirely and keep the exact placeholder-1 convention — there's no real multi-instance data for
+    // those entity types yet to make an override meaningful, and building one now would be guessing
+    // ahead of an actual need (see this phase's own completion report).
+    private async Task<(EntityType EntityType, int EntityId)> ResolveEntityForRoleAsync(int roleId, int? requestedEntityId, CancellationToken cancellationToken)
     {
-        BaytAlUrdonRoleId => (EntityType.BaytAlUrdon, 1),
-        AsezaRoleId => (EntityType.Aseza, 1),
-        ProductionHouseRoleId => (EntityType.ProductionCompany, 1),
-        AssociationRoleId => (EntityType.Association, 1),
-        _ => throw new KeyNotFoundException("Role was not found.")
-    };
+        if (roleId == AssociationRoleId && requestedEntityId.HasValue)
+        {
+            var association = await _unitOfWork.Associations.GetByIdAsync(requestedEntityId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException("Association was not found.");
+
+            return (EntityType.Association, association.Id);
+        }
+
+        return roleId switch
+        {
+            BaytAlUrdonRoleId => (EntityType.BaytAlUrdon, 1),
+            AsezaRoleId => (EntityType.Aseza, 1),
+            ProductionHouseRoleId => (EntityType.ProductionCompany, 1),
+            AssociationRoleId => (EntityType.Association, 1),
+            _ => throw new KeyNotFoundException("Role was not found.")
+        };
+    }
 
     // MAYD-20: Business Rule (MAYD-1) — only Bayt-AlUrdon and ASEZA may view an entity other than
     // their own; every other role is rejected for anything but its own entity. Requesting no

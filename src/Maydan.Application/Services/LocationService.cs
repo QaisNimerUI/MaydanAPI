@@ -203,6 +203,95 @@ public class LocationService : ILocationService
         return MapCity(city);
     }
 
+    // MAYD-51 Phase 2d: CityLocations, the third and last tier under Country -> City. Same
+    // "list shows active+deleted together" shape as GetCitiesByCountryAsync above — see
+    // ICityLocationRepository.GetByCityIdAsync's own comment for why (the admin page's Restore
+    // button would be unreachable otherwise, since a deleted row would never appear in the list).
+    public async Task<List<CityLocationDto>> GetCityLocationsByCityAsync(int cityId, CancellationToken cancellationToken = default)
+    {
+        var cityLocations = await _unitOfWork.CityLocations.GetByCityIdAsync(cityId, cancellationToken);
+        return cityLocations.Select(MapCityLocation).ToList();
+    }
+
+    public async Task<CityLocationDto> CreateCityLocationAsync(CreateCityLocationDto dto, int currentUserId, CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+        ValidateName(dto.EnglishName, "English city location name");
+        ValidateName(dto.ArabicName, "Arabic city location name");
+
+        await EnsureCityExistsAsync(dto.CityId, cancellationToken);
+
+        var cityLocation = new CityLocation
+        {
+            EnglishName = dto.EnglishName.Trim(),
+            ArabicName = dto.ArabicName.Trim(),
+            CityId = dto.CityId,
+            CreatedBy = currentUser.UserId,
+            IsActive = true
+        };
+
+        await _unitOfWork.CityLocations.AddAsync(cityLocation, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return MapCityLocation(cityLocation);
+    }
+
+    public async Task<CityLocationDto> UpdateCityLocationAsync(UpdateCityLocationDto dto, int currentUserId, CancellationToken cancellationToken = default)
+    {
+        await GetCurrentUserAsync(currentUserId, cancellationToken);
+        ValidateName(dto.EnglishName, "English city location name");
+        ValidateName(dto.ArabicName, "Arabic city location name");
+
+        var cityLocation = await _unitOfWork.CityLocations.GetByIdAsync(dto.Id, cancellationToken)
+            ?? throw new KeyNotFoundException("City location was not found.");
+
+        await EnsureCityExistsAsync(dto.CityId, cancellationToken);
+
+        cityLocation.EnglishName = dto.EnglishName.Trim();
+        cityLocation.ArabicName = dto.ArabicName.Trim();
+        cityLocation.CityId = dto.CityId;
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return MapCityLocation(cityLocation);
+    }
+
+    // Plain, unconditional soft-delete — matching DeleteCityAsync above, NOT DeleteCountryAsync's
+    // "block if active children exist" pattern. Reason: nothing in this codebase currently persists
+    // a real FK to CityLocation.Id — Association deliberately does NOT (AssociationDto's own
+    // comment) and no CityLocation-consuming module exists yet — so there is nothing to protect
+    // against by blocking. Revisit if a future phase adds a real dependent.
+    public async Task DeleteCityLocationAsync(int cityLocationId, int currentUserId, CancellationToken cancellationToken = default)
+    {
+        await GetCurrentUserAsync(currentUserId, cancellationToken);
+
+        var cityLocation = await _unitOfWork.CityLocations.GetByIdAsync(cityLocationId, cancellationToken)
+            ?? throw new KeyNotFoundException("City location was not found.");
+
+        _unitOfWork.CityLocations.Remove(cityLocation);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<CityLocationDto> RestoreCityLocationAsync(int cityLocationId, int currentUserId, CancellationToken cancellationToken = default)
+    {
+        await GetCurrentUserAsync(currentUserId, cancellationToken);
+
+        var cityLocation = await _unitOfWork.CityLocations.GetByIdIncludingDeletedAsync(cityLocationId, cancellationToken)
+            ?? throw new KeyNotFoundException("City location was not found.");
+
+        if (!cityLocation.IsDeleted)
+        {
+            throw new InvalidOperationException("City location is not deleted.");
+        }
+
+        cityLocation.IsDeleted = false;
+        cityLocation.DeletedAt = null;
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return MapCityLocation(cityLocation);
+    }
+
     private async Task<User> GetCurrentUserAsync(int currentUserId, CancellationToken cancellationToken)
     {
         var user = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
@@ -221,6 +310,17 @@ public class LocationService : ILocationService
         if (await _unitOfWork.Countries.GetByIdAsync(countryId, cancellationToken) is null)
         {
             throw new KeyNotFoundException("Country was not found.");
+        }
+    }
+
+    // Same real, active-only City-validation precedent CreateCityAsync's own EnsureCountryExistsAsync
+    // establishes for CountryId — ICityRepository.GetByIdAsync is active-only, so a soft-deleted City
+    // correctly fails this the same way an unknown one does.
+    private async Task EnsureCityExistsAsync(int cityId, CancellationToken cancellationToken)
+    {
+        if (await _unitOfWork.Cities.GetByIdAsync(cityId, cancellationToken) is null)
+        {
+            throw new KeyNotFoundException("City was not found.");
         }
     }
 
@@ -252,5 +352,14 @@ public class LocationService : ILocationService
         CityArabicName = city.ArabicName,
         CountryId = city.CountryId,
         IsDeleted = city.IsDeleted
+    };
+
+    private static CityLocationDto MapCityLocation(CityLocation cityLocation) => new()
+    {
+        Id = cityLocation.Id,
+        EnglishName = cityLocation.EnglishName,
+        ArabicName = cityLocation.ArabicName,
+        CityId = cityLocation.CityId,
+        IsDeleted = cityLocation.IsDeleted
     };
 }

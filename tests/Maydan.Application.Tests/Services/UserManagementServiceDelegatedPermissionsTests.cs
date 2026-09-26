@@ -183,6 +183,7 @@ public class UserManagementServiceDelegatedPermissionsTests
 
         public Task<User?> GetByEmailWithAccessAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<User>> GetDeletedByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetDetailsReadOnlyAsync(int userId, CancellationToken cancellationToken = default) =>
             Task.FromResult(FixUp(_usersById.TryGetValue(userId, out var user) ? user : null));
         public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -227,6 +228,7 @@ public class UserManagementServiceDelegatedPermissionsTests
         public IProjectTypeRepository ProjectTypes => throw new NotSupportedException();
         public ICountryRepository Countries => throw new NotSupportedException();
         public ICityRepository Cities => throw new NotSupportedException();
+        public ICityLocationRepository CityLocations => throw new NotSupportedException();
         public IAssociationRepository Associations => throw new NotSupportedException();
         public IProductionCompanyRepository ProductionCompanies => throw new NotSupportedException();
         public IProjectRepository Projects => throw new NotSupportedException();

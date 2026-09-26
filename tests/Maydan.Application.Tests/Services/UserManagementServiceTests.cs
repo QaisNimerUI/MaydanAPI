@@ -146,6 +146,90 @@ public class UserManagementServiceTests
         Assert.Equal(expectedEntityType, userRepository.AddedUser!.EntityType);
     }
 
+    // Association Management, Phase 2b (2026-09-26): the real gap this closes — every prior test
+    // above proves the PLACEHOLDER (EntityId = 1) is used for a cross-entity create; these prove
+    // the opt-in override actually reaches a real Association row when the caller supplies one
+    // (e.g. Bayt-AlUrdon creating a user from /associations/9004/users/new), and that every other
+    // combination above (no dto.EntityId at all) is completely untouched by this addition.
+    [Fact]
+    public async Task CreateUserAsync_BaytAlUrdonCreatingAssociationRoleWithARealEntityId_UsesTheRealAssociationIdNotThePlaceholder()
+    {
+        var baytAlUrdonRole = new Role { RoleId = 1, RoleNameEn = "Bayt-AlUrdon", RoleNameAr = "بيت الأردن" };
+        var associationRole = new Role { RoleId = 4, RoleNameEn = "Association", RoleNameAr = "الجمعية" };
+        var currentUser = new User
+        {
+            UserId = 1,
+            RoleId = baytAlUrdonRole.RoleId,
+            Role = baytAlUrdonRole,
+            EntityType = EntityType.BaytAlUrdon,
+            EntityId = 1,
+            IsActive = true
+        };
+        var realAssociation = new Association { Id = 9004, EnglishName = "Real Association", ArabicName = "جمعية حقيقية" };
+
+        var userRepository = new FakeUserRepository(currentUser, associationRole);
+        var associationRepository = new FakeAssociationRepository(realAssociation);
+        var unitOfWork = new FakeUnitOfWork(userRepository, new FakeRoleRepository(baytAlUrdonRole, associationRole), associations: associationRepository);
+        var service = new UserManagementService(unitOfWork, new FakePasswordHasher());
+
+        var dto = new CreateEntityUserDto
+        {
+            FirstNameEn = "Real",
+            LastNameEn = "Association User",
+            FirstNameAr = "حقيقي",
+            LastNameAr = "مستخدم جمعية",
+            Email = "real.association.user@example.org",
+            PhoneNumber = "+962700000003",
+            InitialPassword = "P@ssw0rd!",
+            RoleId = associationRole.RoleId,
+            EntityId = realAssociation.Id
+        };
+
+        var result = await service.CreateUserAsync(currentUser.UserId, dto);
+
+        Assert.Equal(EntityType.Association, result.EntityType);
+        Assert.Equal(9004, result.EntityId); // the REAL association id, not the placeholder 1
+        Assert.NotNull(userRepository.AddedUser);
+        Assert.Equal(9004, userRepository.AddedUser!.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_BaytAlUrdonCreatingAssociationRoleWithAnUnknownEntityId_ThrowsKeyNotFoundExceptionAndNeverCreatesTheUser()
+    {
+        var baytAlUrdonRole = new Role { RoleId = 1, RoleNameEn = "Bayt-AlUrdon", RoleNameAr = "بيت الأردن" };
+        var associationRole = new Role { RoleId = 4, RoleNameEn = "Association", RoleNameAr = "الجمعية" };
+        var currentUser = new User
+        {
+            UserId = 1,
+            RoleId = baytAlUrdonRole.RoleId,
+            Role = baytAlUrdonRole,
+            EntityType = EntityType.BaytAlUrdon,
+            EntityId = 1,
+            IsActive = true
+        };
+
+        var userRepository = new FakeUserRepository(currentUser, associationRole);
+        var associationRepository = new FakeAssociationRepository(); // empty — no association 999
+        var unitOfWork = new FakeUnitOfWork(userRepository, new FakeRoleRepository(baytAlUrdonRole, associationRole), associations: associationRepository);
+        var service = new UserManagementService(unitOfWork, new FakePasswordHasher());
+
+        var dto = new CreateEntityUserDto
+        {
+            FirstNameEn = "Bad",
+            LastNameEn = "Entity",
+            FirstNameAr = "سيء",
+            LastNameAr = "كيان",
+            Email = "bad.entity@example.org",
+            PhoneNumber = "+962700000004",
+            InitialPassword = "P@ssw0rd!",
+            RoleId = associationRole.RoleId,
+            EntityId = 999
+        };
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.CreateUserAsync(currentUser.UserId, dto));
+        Assert.Null(userRepository.AddedUser);
+    }
+
     [Fact]
     public async Task CreateUserAsync_BaytAlUrdonCreatingADifferentRole_ScopesGroupIdValidationToTheTargetEntityNotTheCallers()
     {
@@ -186,6 +270,24 @@ public class UserManagementServiceTests
         // not EntityType.BaytAlUrdon/1, the caller's own entity — the exact bug this fix closes.
         Assert.Equal(EntityType.Association, groupRepository.LastQueriedEntityType);
         Assert.Equal(1, groupRepository.LastQueriedEntityId);
+    }
+
+    private sealed class FakeAssociationRepository : IAssociationRepository
+    {
+        private readonly Dictionary<int, Association> _associationsById;
+        public FakeAssociationRepository(params Association[] associations) => _associationsById = associations.ToDictionary(a => a.Id);
+
+        public Task<Association?> GetByIdAsync(int associationId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_associationsById.TryGetValue(associationId, out var association) ? association : null);
+
+        // Not exercised by CreateUserAsync's entityId-override path.
+        public Task<Association?> GetByIdIncludingDeletedAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Association?> GetByIdWithWorkersAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<(Association Association, int WorkersCount)?> GetByIdWithWorkersCountAsync(int associationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<(Association Association, int WorkersCount)>> QueryAsync(bool isDeleted, string? searchTerm = null, bool? orderByWorkersCountAscending = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<Association>> GetAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task AddAsync(Association association, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Remove(Association association) => throw new NotSupportedException();
     }
 
     private sealed class FakeUserRepository : IUserRepository
@@ -241,6 +343,7 @@ public class UserManagementServiceTests
         // Not exercised by either test above.
         public Task<User?> GetByEmailWithAccessAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<User>> GetByEntityAsync(EntityType entityType, int entityId, string? search, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<User>> GetDeletedByEntityAsync(EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<(List<User> Users, int TotalCount)> GetPagedByEntityAsync(EntityType entityType, int entityId, string? search, bool? isActive, int page, int pageSize, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         // MAYD-37: GetCurrentUserAsync now fetches via GetDetailsAsync (not GetByIdAsync) so
         // UserPermissions/UserGroups are loaded for the caller — same lookup as GetByIdAsync above.
@@ -301,17 +404,20 @@ public class UserManagementServiceTests
         public bool VerifyPassword(string password, string passwordHash) => passwordHash == $"hashed:{password}";
     }
 
-    // Users/Roles are always backed by a working fake; Groups only when a test explicitly passes
-    // one (most tests use empty GroupIds, so EnsureGroupsInEntityAsync returns before touching it).
+    // Users/Roles are always backed by a working fake; Groups/Associations only when a test
+    // explicitly passes one (most tests use empty GroupIds, so EnsureGroupsInEntityAsync returns
+    // before touching it; Associations is only touched by the new entityId-override path below).
     private sealed class FakeUnitOfWork : IUnitOfWork
     {
         private readonly IGroupRepository? _groups;
+        private readonly IAssociationRepository? _associations;
 
-        public FakeUnitOfWork(IUserRepository users, IRoleRepository roles, IGroupRepository? groups = null)
+        public FakeUnitOfWork(IUserRepository users, IRoleRepository roles, IGroupRepository? groups = null, IAssociationRepository? associations = null)
         {
             Users = users;
             Roles = roles;
             _groups = groups;
+            _associations = associations;
         }
 
         public IUserRepository Users { get; }
@@ -321,7 +427,8 @@ public class UserManagementServiceTests
         public IProjectTypeRepository ProjectTypes => throw new NotSupportedException();
         public ICountryRepository Countries => throw new NotSupportedException();
         public ICityRepository Cities => throw new NotSupportedException();
-        public IAssociationRepository Associations => throw new NotSupportedException();
+        public ICityLocationRepository CityLocations => throw new NotSupportedException();
+        public IAssociationRepository Associations => _associations ?? throw new NotSupportedException();
         public IProductionCompanyRepository ProductionCompanies => throw new NotSupportedException();
         public IProjectRepository Projects => throw new NotSupportedException();
         public IWorkerRepository Workers => throw new NotSupportedException();

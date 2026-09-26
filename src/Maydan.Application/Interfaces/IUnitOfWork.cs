@@ -9,6 +9,7 @@ public interface IUnitOfWork
     IProjectTypeRepository ProjectTypes { get; }
     ICountryRepository Countries { get; }
     ICityRepository Cities { get; }
+    ICityLocationRepository CityLocations { get; }
     IAssociationRepository Associations { get; }
     IProductionCompanyRepository ProductionCompanies { get; }
     IProjectRepository Projects { get; }
