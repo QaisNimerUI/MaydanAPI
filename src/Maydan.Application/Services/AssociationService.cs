@@ -1,5 +1,6 @@
 using System.Globalization;
 using Maydan.Application.DTOs.Associations;
+using Maydan.Application.DTOs.UserManagement;
 using Maydan.Application.Interfaces;
 using Maydan.Domain.Entities;
 using Maydan.Domain.Enums;
@@ -44,11 +45,24 @@ public class AssociationService : IAssociationService
     private const int DeleteAssociationsPermissionId = 12;
     private const int ManageAssociationsPermissionId = 13;
 
-    private readonly IUnitOfWork _unitOfWork;
+    // Association Users/Details gap (2026-09-29): id 14, "View Association Users" — already seeded
+    // (RolePermissionSeedConfiguration.cs) and already granted to ASEZA and the Association role
+    // itself, but never checked anywhere in the backend until GetDetailsAsync below, because no
+    // endpoint existed for it to gate. Confirmed via that seed file: ASEZA holds this permission but
+    // deliberately does NOT hold ViewAssociationsPermissionId (removed at the role level per MAYD-37
+    // — ASEZA's Association oversight is meant to be view-only and cross-entity, not full
+    // Associations access) — so GetDetailsAsync gates on ViewAssociationUsers OR ManageAssociations,
+    // never on ViewAssociationsPermissionId, or ASEZA (the permission's own evident intended caller)
+    // would 403 on the one endpoint this permission exists for.
+    private const int ViewAssociationUsersPermissionId = 14;
 
-    public AssociationService(IUnitOfWork unitOfWork)
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IPasswordHasher _passwordHasher;
+
+    public AssociationService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher)
     {
         _unitOfWork = unitOfWork;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<List<AssociationDto>> GetAllAsync(int currentUserId, CancellationToken cancellationToken = default)
@@ -67,6 +81,28 @@ public class AssociationService : IAssociationService
             ?? throw new KeyNotFoundException("Association was not found.");
 
         return MapToDto(result.Association, result.WorkersCount);
+    }
+
+    // Association Users/Details gap: the one response that returns an Association's own fields
+    // together with its real Users (EntityType.Association + EntityId == associationId — same
+    // "users associated with an association" convention DeleteAsync's cascade and
+    // EntityOnboardingService's admin-check already rely on; no separate AssociationUser link entity
+    // exists). Deliberately its own method rather than added to GetByIdAsync/MapToDto: those are
+    // shared by every list endpoint too (GetAllAsync/SearchByNameAsync/GetOrderedByWorkersCountAsync/
+    // GetDeletedAsync/SearchDeletedByNameAsync), and populating a Users list on every row of a list
+    // response — an unbounded per-row query — is the exact perf cost this gap's own brief asked to
+    // avoid; this method exists so that cost is paid only for the single-item call that actually asks
+    // for it.
+    public async Task<AssociationDetailsDto> GetDetailsAsync(int currentUserId, int associationId, CancellationToken cancellationToken = default)
+    {
+        await GetAuthorizedUserAsync(currentUserId, ViewAssociationUsersPermissionId, cancellationToken);
+
+        var result = await _unitOfWork.Associations.GetByIdWithWorkersCountAsync(associationId, cancellationToken)
+            ?? throw new KeyNotFoundException("Association was not found.");
+
+        var users = await _unitOfWork.Users.GetByEntityAsync(EntityType.Association, associationId, search: null, cancellationToken);
+
+        return MapToDetailsDto(result.Association, result.WorkersCount, users);
     }
 
     public async Task<List<AssociationDto>> SearchByNameAsync(int currentUserId, string name, CancellationToken cancellationToken = default)
@@ -109,6 +145,26 @@ public class AssociationService : IAssociationService
         ValidateName(dto.ArabicName, "Arabic association name");
         await EnsureCityExistsAsync(dto.CityId, cancellationToken);
 
+        // Association Admin User gap: dto.Admin is optional — every existing caller omits it and
+        // gets exactly today's association-only behavior (the plain AddAsync/SaveChangesAsync path
+        // below, unchanged). When provided, resolve and validate everything the admin creation needs
+        // BEFORE opening a transaction (fail fast on a bad admin payload without ever touching the
+        // DB transactionally) — same ordering ProductionCompanyOnboardingService.RegisterAsync uses.
+        var adminPayload = dto.Admin;
+        Role? adminRole = null;
+        if (adminPayload is not null)
+        {
+            AssociationAdminUserFactory.ValidatePayload(adminPayload);
+
+            if (await _unitOfWork.Users.EmailExistsAsync(adminPayload.Email.Trim(), cancellationToken))
+            {
+                throw new InvalidOperationException("A user with this email already exists.");
+            }
+
+            adminRole = await _unitOfWork.Roles.GetWithPermissionsAsync(AssociationAdminUserFactory.AssociationRoleId, cancellationToken)
+                ?? throw new KeyNotFoundException("Association role was not found.");
+        }
+
         var association = new Association
         {
             EnglishName = dto.EnglishName.Trim(),
@@ -121,8 +177,34 @@ public class AssociationService : IAssociationService
             IsActive = true
         };
 
-        await _unitOfWork.Associations.AddAsync(association, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        if (adminRole is null)
+        {
+            // Unchanged from before this gap: a single insert is already atomic, no transaction
+            // wrapper needed for the (overwhelmingly common, every-existing-caller) admin-omitted path.
+            await _unitOfWork.Associations.AddAsync(association, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            // Two SaveChangesAsync calls, not one: see IUnitOfWork.ExecuteInTransactionAsync's comment
+            // on why the admin User's EntityId (a soft FK) can't be populated before Association.Id
+            // exists — same reason ProductionCompanyOnboardingService.RegisterAsync needs the same
+            // shape. If AddAsync/SaveChangesAsync for the admin User throws for any reason (e.g. a
+            // race on the email-uniqueness check just above), the transaction rolls back the
+            // Association insert too — never left half-done.
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await _unitOfWork.Associations.AddAsync(association, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+                // adminPayload and adminRole are always set together (both null or both non-null,
+                // see the check above) — null-forgiving here rather than restructuring into an extra
+                // type just to carry that correlation to the compiler.
+                var adminUser = AssociationAdminUserFactory.Build(adminRole, association.Id, adminPayload!, _passwordHasher);
+                await _unitOfWork.Users.AddAsync(adminUser, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }, cancellationToken);
+        }
 
         return await MapExistingAsync(association.Id, cancellationToken);
     }
@@ -393,4 +475,31 @@ public class AssociationService : IAssociationService
 
     private static string FormatCoordinate(decimal? value) =>
         value?.ToString("0.######", CultureInfo.InvariantCulture) ?? string.Empty;
+
+    // Reuses UserManagementService.MapUserSummary (internal) for the Users list — same real User
+    // rows, same UserSummaryDto shape GroupDetailsDto/PagedUsersDto already return elsewhere, not a
+    // new mapping invented for this one endpoint.
+    private static AssociationDetailsDto MapToDetailsDto(Association association, int workersCount, List<User> users)
+    {
+        var dto = MapToDto(association, workersCount);
+
+        return new AssociationDetailsDto
+        {
+            Id = dto.Id,
+            EnglishName = dto.EnglishName,
+            ArabicName = dto.ArabicName,
+            LocationOnGoogleMaps = dto.LocationOnGoogleMaps,
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            CountryId = dto.CountryId,
+            CountryEnglishName = dto.CountryEnglishName,
+            CountryArabicName = dto.CountryArabicName,
+            CityId = dto.CityId,
+            CityEnglishName = dto.CityEnglishName,
+            CityArabicName = dto.CityArabicName,
+            IsDeleted = dto.IsDeleted,
+            WorkersCount = dto.WorkersCount,
+            Users = users.Select(UserManagementService.MapUserSummary).ToList()
+        };
+    }
 }

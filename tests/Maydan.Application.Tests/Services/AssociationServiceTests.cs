@@ -1,4 +1,5 @@
 using Maydan.Application.DTOs.Associations;
+using Maydan.Application.DTOs.Onboarding;
 using Maydan.Application.Interfaces;
 using Maydan.Application.Services;
 using Maydan.Domain.Entities;
@@ -19,6 +20,8 @@ public class AssociationServiceTests
     private const int EditAssociations = 11;
     private const int DeleteAssociations = 12;
     private const int ManageAssociations = 13;
+    private const int ViewAssociationUsers = 14;
+    private const int AssociationRoleId = 4;
 
     private static Role BuildRole(int roleId, string nameEn, params int[] permissionIds)
     {
@@ -155,6 +158,135 @@ public class AssociationServiceTests
         var dto = new CreateAssociationDto { EnglishName = "X", ArabicName = "س", CityId = 999 };
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.CreateAsync(caller.UserId, dto));
+    }
+
+    private static OnboardAssociationAdminDto BuildAdminDto(string email = "new-admin@example.org") => new()
+    {
+        FirstNameEn = "Admin",
+        LastNameEn = "One",
+        FirstNameAr = "ادمن",
+        LastNameAr = "واحد",
+        Email = email,
+        PhoneNumber = "+962700000000",
+        InitialPassword = "Init@12345"
+    };
+
+    // Association Admin User gap.
+    [Fact]
+    public async Task CreateAsync_WithAdminPayload_CreatesAssociationAndAdminUserInSameCall()
+    {
+        var caller = BuildUser(1, BuildRole(1, "Bayt-AlUrdon", CreateAssociations, ViewAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(5, country);
+        var associationRole = BuildRole(AssociationRoleId, "Association", ViewAssociations, ViewAssociationUsers);
+        var (service, _, userRepository) = BuildServiceWithRepositoryAndUsers(caller, null, [city], null, null, new FakeRoleRepository(associationRole));
+
+        var dto = new CreateAssociationDto
+        {
+            EnglishName = "New Assoc",
+            ArabicName = "جمعية جديدة",
+            CityId = city.Id,
+            Latitude = "31.953000",
+            Longitude = "35.910500",
+            Admin = BuildAdminDto()
+        };
+
+        var result = await service.CreateAsync(caller.UserId, dto);
+
+        var createdUsers = await userRepository.GetByEntityAsync(EntityType.Association, result.Id, search: null);
+        var admin = Assert.Single(createdUsers);
+        Assert.Equal("new-admin@example.org", admin.Email);
+        Assert.True(admin.MustResetPassword);
+        Assert.True(admin.IsActive);
+        Assert.Equal(AssociationRoleId, admin.RoleId);
+        Assert.Equal("hashed:Init@12345", admin.PasswordHash);
+        // Role permissions copied onto the new admin as direct UserPermissions, same convention
+        // OnboardAssociationAdminAsync already used — confirms AssociationAdminUserFactory.Build is
+        // genuinely shared, not reimplemented ad hoc for this call site.
+        Assert.Equal(2, admin.UserPermissions.Count);
+    }
+
+    // Association Admin User gap — transaction safety: a duplicate email must fail BEFORE the
+    // Association row is ever inserted (checked up front, outside the transaction), so nothing is
+    // left half-created.
+    [Fact]
+    public async Task CreateAsync_WithAdminPayload_DuplicateEmail_ThrowsAndCreatesNothing()
+    {
+        var caller = BuildUser(1, BuildRole(1, "Bayt-AlUrdon", CreateAssociations, ViewAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(5, country);
+        var existingUser = BuildUser(2, BuildRole(AssociationRoleId, "Association"), entityType: EntityType.Association, entityId: 999);
+        existingUser.Email = "taken@example.org";
+        var associationRole = BuildRole(AssociationRoleId, "Association", ViewAssociations);
+        var (service, associationRepository, userRepository) = BuildServiceWithRepositoryAndUsers(
+            caller, null, [city], [existingUser], null, new FakeRoleRepository(associationRole));
+
+        var dto = new CreateAssociationDto
+        {
+            EnglishName = "New Assoc",
+            ArabicName = "جمعية جديدة",
+            CityId = city.Id,
+            Latitude = "31.953000",
+            Longitude = "35.910500",
+            Admin = BuildAdminDto(email: "taken@example.org")
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(caller.UserId, dto));
+
+        Assert.Empty(await associationRepository.QueryAsync(isDeleted: false));
+        Assert.Single(await userRepository.GetByEntityAsync(EntityType.Association, 999, search: null)); // only the pre-existing one
+    }
+
+    // Association Admin User gap — omitted Admin must be a complete no-op for this new behavior:
+    // still a single, non-transactional insert, exactly as before this gap.
+    [Fact]
+    public async Task CreateAsync_WithoutAdminPayload_CreatesAssociationOnlyExactlyAsBefore()
+    {
+        var caller = BuildUser(1, BuildRole(1, "Bayt-AlUrdon", CreateAssociations, ViewAssociations));
+        var country = BuildCountry(1);
+        var city = BuildCity(5, country);
+        var (service, _, userRepository) = BuildServiceWithRepositoryAndUsers(caller, null, [city], null, null, roles: null);
+
+        var dto = new CreateAssociationDto { EnglishName = "New Assoc", ArabicName = "جمعية جديدة", CityId = city.Id, Latitude = "31.953000", Longitude = "35.910500" };
+
+        var result = await service.CreateAsync(caller.UserId, dto);
+
+        Assert.Empty(await userRepository.GetByEntityAsync(EntityType.Association, result.Id, search: null));
+    }
+
+    // Association Users/Details gap.
+    [Fact]
+    public async Task GetDetailsAsync_CallerWithViewAssociationUsers_ReturnsAssociationFieldsAndUsers()
+    {
+        var country = BuildCountry(1);
+        var city = BuildCity(5, country);
+        var association = new Association { Id = 10, EnglishName = "Amman Assoc", ArabicName = "جمعية عمان", CityId = city.Id, City = city, IsActive = true };
+        var associationUser = BuildUser(2, BuildRole(AssociationRoleId, "Association"), entityType: EntityType.Association, entityId: association.Id);
+        // ASEZA's own real shape (RolePermissionSeedConfiguration.cs): holds ViewAssociationUsers but
+        // deliberately NOT ViewAssociations — proves this endpoint doesn't require ViewAssociations.
+        var caller = BuildUser(1, BuildRole(1, "ASEZA", ViewAssociationUsers), entityType: EntityType.Aseza);
+        var (service, _, _) = BuildServiceWithRepositoryAndUsers(caller, [association], [city], [associationUser], null, roles: null);
+
+        var result = await service.GetDetailsAsync(caller.UserId, association.Id);
+
+        Assert.Equal("Amman Assoc", result.EnglishName);
+        var user = Assert.Single(result.Users);
+        Assert.Equal(associationUser.UserId, user.UserId);
+        Assert.Equal(associationUser.Email, user.Email);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_CallerWithoutViewAssociationUsersOrManage_ThrowsUnauthorizedAccessException()
+    {
+        var country = BuildCountry(1);
+        var city = BuildCity(5, country);
+        var association = new Association { Id = 10, EnglishName = "Amman Assoc", ArabicName = "جمعية عمان", CityId = city.Id, City = city, IsActive = true };
+        // Holds plain ViewAssociations but not ViewAssociationUsers — must still be rejected: the two
+        // are independent permissions, View doesn't imply View-Users.
+        var caller = BuildUser(1, BuildRole(1, "ViewOnly", ViewAssociations));
+        var service = BuildService(caller, [association], [city]);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.GetDetailsAsync(caller.UserId, association.Id));
     }
 
     [Fact]
@@ -350,6 +482,17 @@ public class AssociationServiceTests
     private static (AssociationService Service, FakeAssociationRepository Repository) BuildServiceWithRepository(
         User caller, Association[]? associations, City[]? cities, User[]? users, Worker[]? workers)
     {
+        var (service, associationRepository, _) = BuildServiceWithRepositoryAndUsers(caller, associations, cities, users, workers, roles: null);
+        return (service, associationRepository);
+    }
+
+    // Association Admin User / Association Users-Details gaps: the one place a role repository (for
+    // the inline-admin path's role lookup) and the user repository itself (so a test can assert on
+    // the admin User the service created) are both exposed — every pre-existing call above still
+    // goes through the simpler overloads and is unaffected.
+    private static (AssociationService Service, FakeAssociationRepository AssociationRepository, FakeUserRepository UserRepository) BuildServiceWithRepositoryAndUsers(
+        User caller, Association[]? associations, City[]? cities, User[]? users, Worker[]? workers, IRoleRepository? roles)
+    {
         // MAYD-51 cascade users/workers passed here are on top of the caller — the caller themselves
         // is looked up separately via GetByIdAsync/GetWithPermissionsAsync (see FakeUserRepository),
         // never through GetByEntityAsync, matching the real UserRepository's own separation.
@@ -362,8 +505,8 @@ public class AssociationServiceTests
         var associationRepository = new FakeAssociationRepository(associations ?? [], cities ?? [], workers);
         var cityRepository = new FakeCityRepository(cities ?? []);
 
-        var unitOfWork = new FakeUnitOfWork(userRepository, associationRepository, cityRepository, workerRepository);
-        return (new AssociationService(unitOfWork), associationRepository);
+        var unitOfWork = new FakeUnitOfWork(userRepository, associationRepository, cityRepository, workerRepository, roles);
+        return (new AssociationService(unitOfWork, new FakePasswordHasher()), associationRepository, userRepository);
     }
 
     // MAYD-51: the pending-removal + CommitPendingRemovals(utcNow) split below (also used by
@@ -412,12 +555,45 @@ public class AssociationServiceTests
         public Task<User?> GetByEmailWithAccessAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetDetailsAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetDetailsReadOnlyAsync(int userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetByUserNameEnAsync(User user, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<User?> GetByUserNameArAsync(User user, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<User>> GetByIdsInEntityAsync(IEnumerable<int> userIds, EntityType entityType, int entityId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<(List<User> Users, int TotalCount)> GetPagedByEntityAsync(EntityType entityType, int entityId, string? search, bool? isActive, int page, int pageSize, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task AddAsync(User user, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        // Association Admin User gap: real behavior needed now that AssociationService.CreateAsync's
+        // optional inline-admin path calls both of these — previously unreachable from this test file
+        // so both just threw.
+        public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_users.Any(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase)));
+
+        public Task AddAsync(User user, CancellationToken cancellationToken = default)
+        {
+            user.UserId = user.UserId == 0 ? _users.Count + 900 : user.UserId;
+            _users.Add(user);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeRoleRepository : IRoleRepository
+    {
+        private readonly Role _associationRole;
+
+        public FakeRoleRepository(Role associationRole) => _associationRole = associationRole;
+
+        public Task<Role?> GetWithPermissionsAsync(int roleId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(roleId == _associationRole.RoleId ? _associationRole : null);
+
+        public Task<Role?> GetByIdAsync(int roleId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<Role>> GetAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<Role>> GetAllWithPermissionsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task AddAsync(Role role, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Remove(Role role) => throw new NotSupportedException();
+    }
+
+    private sealed class FakePasswordHasher : IPasswordHasher
+    {
+        public string HashPassword(string password) => $"hashed:{password}";
+        public bool VerifyPassword(string password, string passwordHash) => passwordHash == $"hashed:{password}";
     }
 
     private sealed class FakeWorkerRepository : IWorkerRepository
@@ -563,12 +739,14 @@ public class AssociationServiceTests
         private readonly FakeUserRepository _users;
         private readonly FakeAssociationRepository _associations;
         private readonly FakeWorkerRepository _workers;
+        private readonly IRoleRepository? _roles;
 
-        public FakeUnitOfWork(FakeUserRepository users, FakeAssociationRepository associations, ICityRepository cities, FakeWorkerRepository? workers = null)
+        public FakeUnitOfWork(FakeUserRepository users, FakeAssociationRepository associations, ICityRepository cities, FakeWorkerRepository? workers = null, IRoleRepository? roles = null)
         {
             _users = users;
             _associations = associations;
             _workers = workers ?? new FakeWorkerRepository();
+            _roles = roles;
             Cities = cities;
         }
 
@@ -578,7 +756,7 @@ public class AssociationServiceTests
         public ICityLocationRepository CityLocations => throw new NotSupportedException();
         public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => throw new NotSupportedException();
         public IWorkerRepository Workers => _workers;
-        public IRoleRepository Roles => throw new NotSupportedException();
+        public IRoleRepository Roles => _roles ?? throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
         public IGroupRepository Groups => throw new NotSupportedException();
         public IProjectTypeRepository ProjectTypes => throw new NotSupportedException();

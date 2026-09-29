@@ -1,3 +1,6 @@
+using Maydan.Application.DTOs.Onboarding;
+using Maydan.Application.DTOs.UserManagement;
+
 namespace Maydan.Application.DTOs.Associations;
 
 // Field names match workforcment's src/app/features/associations/models/association.model.ts
@@ -59,9 +62,33 @@ public class CreateAssociationDto
     // doesn't belong to the claimed CountryId would otherwise go undetected).
     public int? CountryId { get; set; }
     public int CityId { get; set; }
+
+    // Association Admin User gap (2026-09-29): optional. Omitted (null, today's exact behavior for
+    // every existing caller) = association-only, its admin linked later via the existing
+    // EntityOnboardingController associations/without-admin + associations/{id}/admin flow — unchanged.
+    // Provided = AssociationService.CreateAsync creates the Association AND this admin in one
+    // transaction, reusing that same onboarding flow's own user-creation logic (AssociationAdminUserFactory)
+    // rather than duplicating it. Field shape mirrors OnboardAssociationAdminDto exactly (reused
+    // directly, not re-declared) since it's the same "new Association admin" payload either way.
+    public OnboardAssociationAdminDto? Admin { get; set; }
 }
 
 public class UpdateAssociationDto : CreateAssociationDto
 {
     public int Id { get; set; }
+}
+
+// Association Users/Details gap (2026-09-29): AssociationDto itself is deliberately left unchanged
+// (used by 5 different endpoints — GetAll/GetById/SearchByName/GetOrderedByWorkersCount/GetDeleted/
+// SearchDeletedByName — adding a Users list there would mean populating it on every list row or
+// leaving it silently empty depending on which endpoint served it, an implicit contract). This is a
+// separate, additive response type for the one new endpoint that actually needs the combination
+// (GET api/associations/{id}/details), composed from AssociationDto's own fields plus the same real
+// User rows (EntityType.Association + EntityId == association.Id) AssociationService.DeleteAsync's
+// cascade and EntityOnboardingService's admin-check already read the same way. Reuses the existing
+// UserManagementDtos.UserSummaryDto instead of a new per-association user DTO — same shape, same
+// mapping (UserManagementService.MapUserSummary, now internal for this reuse).
+public class AssociationDetailsDto : AssociationDto
+{
+    public List<UserSummaryDto> Users { get; set; } = new();
 }

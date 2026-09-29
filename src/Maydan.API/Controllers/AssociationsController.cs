@@ -158,6 +158,27 @@ public class AssociationsController : ApiControllerBase
         }
     }
 
+    // Association Users/Details gap (2026-09-29): combines this Association's own fields with its
+    // real Users (EntityType.Association-scoped) in one response — see AssociationService.GetDetailsAsync's
+    // own comment for why this is a separate endpoint/DTO rather than added to GetById/AssociationDto.
+    [HttpGet("{id:int}/details")]
+    public async Task<ActionResult<AssociationDetailsDto>> GetDetails(int id, CancellationToken cancellationToken)
+    {
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized(new { message = "Current user id is required." });
+        }
+
+        try
+        {
+            return Ok(await _associationService.GetDetailsAsync(currentUserId, id, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return HandleException(exception);
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<AssociationDto>> Create([FromBody] CreateAssociationDto dto, CancellationToken cancellationToken)
     {
