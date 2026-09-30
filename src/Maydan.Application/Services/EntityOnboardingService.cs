@@ -15,10 +15,10 @@ namespace Maydan.Application.Services;
 // Association), which that guard exists specifically to reject in the normal wizard.
 public class EntityOnboardingService : IEntityOnboardingService
 {
-    // Matches PermissionSeedConfiguration.cs id 37 ("Onboard Entities") and
-    // RolePermissionSeedConfiguration.cs's AssociationRoleId const (RoleId 4).
+    // Matches PermissionSeedConfiguration.cs id 37 ("Onboard Entities"). The target role id
+    // (RoleId 4) now lives on AssociationAdminUserFactory, shared with AssociationService's own
+    // inline-admin path — see that class's own comment.
     private const int OnboardEntitiesPermissionId = 37;
-    private const int AssociationRoleId = 4;
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
@@ -32,7 +32,7 @@ public class EntityOnboardingService : IEntityOnboardingService
     public async Task<UserDetailsDto> OnboardAssociationAdminAsync(int currentUserId, int associationId, OnboardAssociationAdminDto dto, CancellationToken cancellationToken = default)
     {
         await EnsureCallerCanOnboardAsync(currentUserId, cancellationToken);
-        ValidatePayload(dto);
+        AssociationAdminUserFactory.ValidatePayload(dto);
 
         var association = await _unitOfWork.Associations.GetByIdAsync(associationId, cancellationToken)
             ?? throw new KeyNotFoundException("Association was not found.");
@@ -49,32 +49,10 @@ public class EntityOnboardingService : IEntityOnboardingService
             throw new InvalidOperationException("A user with this email already exists.");
         }
 
-        var role = await _unitOfWork.Roles.GetWithPermissionsAsync(AssociationRoleId, cancellationToken)
+        var role = await _unitOfWork.Roles.GetWithPermissionsAsync(AssociationAdminUserFactory.AssociationRoleId, cancellationToken)
             ?? throw new KeyNotFoundException("Association role was not found.");
 
-        var user = new User
-        {
-            FirstNameEn = dto.FirstNameEn.Trim(),
-            LastNameEn = dto.LastNameEn.Trim(),
-            FirstNameAr = dto.FirstNameAr.Trim(),
-            LastNameAr = dto.LastNameAr.Trim(),
-            Email = email,
-            PhoneNumber = dto.PhoneNumber.Trim(),
-            PasswordHash = _passwordHasher.HashPassword(dto.InitialPassword),
-            // Opposite of Stage 1's reasoning: Bayt-AlUrdon is picking this password on someone
-            // else's behalf, not the admin themselves, so force a reset on first login — same as
-            // UserManagementService.CreateUserAsync's own wizard-created employees.
-            MustResetPassword = true,
-            IsActive = true,
-            RoleId = role.RoleId,
-            EntityType = EntityType.Association,
-            EntityId = association.Id
-        };
-
-        foreach (var rolePermission in role.RolePermissions.Where(rp => rp.IsActive && rp.Permission.IsActive))
-        {
-            user.UserPermissions.Add(new UserPermission { PermissionId = rolePermission.PermissionId, IsActive = true });
-        }
+        var user = AssociationAdminUserFactory.Build(role, association.Id, dto, _passwordHasher);
 
         // Unlike Stage 1: no create-parent-then-fetch-generated-id dance, and so no transaction
         // wrapper — the Association already exists and associationId is already real, so EntityId
@@ -156,20 +134,6 @@ public class EntityOnboardingService : IEntityOnboardingService
             .Select(gp => gp.PermissionId);
 
         return rolePermissionIds.Concat(directPermissionIds).Concat(groupPermissionIds).ToHashSet();
-    }
-
-    private static void ValidatePayload(OnboardAssociationAdminDto dto)
-    {
-        if (string.IsNullOrWhiteSpace(dto.FirstNameEn) ||
-            string.IsNullOrWhiteSpace(dto.LastNameEn) ||
-            string.IsNullOrWhiteSpace(dto.FirstNameAr) ||
-            string.IsNullOrWhiteSpace(dto.LastNameAr) ||
-            string.IsNullOrWhiteSpace(dto.Email) ||
-            string.IsNullOrWhiteSpace(dto.PhoneNumber) ||
-            string.IsNullOrWhiteSpace(dto.InitialPassword))
-        {
-            throw new InvalidOperationException("All admin fields are required.");
-        }
     }
 
     // Structurally the same projection as UserManagementService.MapUserDetails (private there) —

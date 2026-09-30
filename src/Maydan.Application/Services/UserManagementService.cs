@@ -875,7 +875,10 @@ public class UserManagementService : IUserManagementService
         }
     }
 
-    private static UserSummaryDto MapUserSummary(User user) =>
+    // Internal rather than private (2026-09-29, Association details/users gap): AssociationService.
+    // GetDetailsAsync reuses this exact mapping for the same real User rows (GetByEntityAsync) rather
+    // than duplicating it — same assembly, so internal is enough, no interface needed for one method.
+    internal static UserSummaryDto MapUserSummary(User user) =>
         new(
             user.UserId,
             user.FirstNameEn,
