@@ -188,6 +188,7 @@ public class SystemConfigurationServiceTests
 
         public IUserRepository Users { get; }
         public ISystemConfigurationRepository SystemConfigurations { get; }
+        public IServiceRepository Services => throw new NotSupportedException();
         public IRoleRepository Roles => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
         public IGroupRepository Groups => throw new NotSupportedException();

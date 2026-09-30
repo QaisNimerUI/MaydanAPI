@@ -279,6 +279,9 @@ public class EntityOnboardingServiceTests
             Roles = roles;
         }
 
+        // Services not used in these tests; satisfy interface by throwing when accessed.
+        public IServiceRepository Services => throw new NotSupportedException();
+
         public IUserRepository Users { get; }
         public IAssociationRepository Associations { get; }
         public IRoleRepository Roles { get; }
@@ -295,6 +298,7 @@ public class EntityOnboardingServiceTests
         public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
         public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
         public ISystemConfigurationRepository SystemConfigurations => throw new NotSupportedException();
+        // duplicate property removed; the above single Services property satisfies the interface
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
 

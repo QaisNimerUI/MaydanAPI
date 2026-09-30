@@ -350,6 +350,8 @@ public class AssociationProjectSupervisorServiceTests
 
     private sealed class FakeUnitOfWork : IUnitOfWork
     {
+
+
         public FakeUnitOfWork(IUserRepository users, IProjectRepository projects, IAssociationRepository associations, IAssociationProjectSupervisorRepository associationProjectSupervisors)
         {
             Users = users;
@@ -374,6 +376,7 @@ public class AssociationProjectSupervisorServiceTests
         public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
         public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
         public ISystemConfigurationRepository SystemConfigurations => throw new NotSupportedException();
+        public IServiceRepository Services => throw new NotSupportedException();
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
         public Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default) => operation();

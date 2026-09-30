@@ -71,6 +71,7 @@ builder.Services.AddDataProtection();
 builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
 builder.Services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
 builder.Services.AddScoped<ISystemConfigurationGateService, SystemConfigurationGateService>();
+builder.Services.AddScoped<IServiceConfigurationService, ServiceConfigurationService>();
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();

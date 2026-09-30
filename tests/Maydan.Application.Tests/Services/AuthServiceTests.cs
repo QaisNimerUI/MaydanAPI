@@ -734,6 +734,7 @@ public class AuthServiceTests
         public IUserRepository Users { get; }
         public IPasswordResetTokenRepository PasswordResetTokens { get; }
         public IRefreshTokenRepository RefreshTokens { get; }
+        public IServiceRepository Services => throw new NotSupportedException();
         public IRoleRepository Roles => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
         public IGroupRepository Groups => throw new NotSupportedException();

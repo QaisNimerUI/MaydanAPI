@@ -588,6 +588,7 @@ public class AssociationServiceTests
         public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
         public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
         public ISystemConfigurationRepository SystemConfigurations => throw new NotSupportedException();
+        public IServiceRepository Services => throw new NotSupportedException();
 
         // Mirrors MaydanDbContext.SaveChangesAsync's own interceptor: ONE utcNow computed per call,
         // applied to every entity Removed (across all three fakes) since the last save — see the

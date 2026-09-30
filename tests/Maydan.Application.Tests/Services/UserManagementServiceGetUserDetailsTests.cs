@@ -126,6 +126,9 @@ public class UserManagementServiceGetUserDetailsTests
     {
         public FakeUnitOfWork(IUserRepository users) => Users = users;
 
+        // Services not used in these tests; satisfy interface by throwing when accessed.
+        public IServiceRepository Services => throw new NotSupportedException();
+
         public IUserRepository Users { get; }
         public IRoleRepository Roles => throw new NotSupportedException();
         public IPermissionRepository Permissions => throw new NotSupportedException();
@@ -142,6 +145,7 @@ public class UserManagementServiceGetUserDetailsTests
         public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
         public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
         public ISystemConfigurationRepository SystemConfigurations => throw new NotSupportedException();
+        // duplicate property removed
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
         public Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default) => operation();
