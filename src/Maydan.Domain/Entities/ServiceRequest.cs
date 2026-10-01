@@ -39,12 +39,13 @@ namespace Maydan.Domain.Entities
         public string? AdditionalRequirements { get; set; }
 
         // Persisted coordinates for the requested location
-        public decimal? Latitude { get; set; }
-        public decimal? Longitude { get; set; }
+       // public decimal? Latitude { get; set; }
+        //public decimal? Longitude { get; set; }
 
         //Financial related properties
-        public decimal UnitPriceSnapshot { get; set; }
         public decimal ExpectedTotalAmount { get; set; }
+        public decimal UnitPriceSnapshot { get; set; }
+
 
         //Status
         public ServiceRequestStatus Status { get; set; } = ServiceRequestStatus.PendingWorkerSelection;

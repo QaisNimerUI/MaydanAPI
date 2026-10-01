@@ -18,8 +18,8 @@ public class CreateServiceRequestDto
     public string? AdditionalRequirements { get; set; }
 
     // Coordinates for the requested location (optional). If not provided, association coordinates will be used when available.
-    public decimal? Latitude { get; set; }
-    public decimal? Longitude { get; set; }
+    //public decimal? Latitude { get; set; }
+    //public decimal? Longitude { get; set; }
 
     public decimal UnitPriceSnapshot { get; set; }
     public decimal ExpectedTotalAmount { get; set; }

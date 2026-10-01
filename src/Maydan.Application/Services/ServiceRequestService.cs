@@ -95,8 +95,8 @@ public class ServiceRequestService : IServiceRequestService
             EndDate = dto.EndDate,
             ShiftsCount = dto.ShiftsCount,
             // Use provided coordinates if present; otherwise fall back to association coordinates
-            Latitude = dto.Latitude ?? association.Latitude,
-            Longitude = dto.Longitude ?? association.Longitude,
+            //Latitude = dto.Latitude ?? association.Latitude,
+            //Longitude = dto.Longitude ?? association.Longitude,
             RequestedWorkersCount = dto.RequestedWorkersCount,
             AttendanceFrequency = dto.AttendanceFrequency,
             AdditionalRequirements = dto.AdditionalRequirements,
@@ -230,15 +230,21 @@ public class ServiceRequestService : IServiceRequestService
 
         var sr = await _unitOfWork.ServiceRequests.GetByIdAsync(id, cancellationToken) ?? throw new KeyNotFoundException("Service request was not found.");
 
-        // Only production company owning the project may cancel while pending
-        if (currentUser.EntityType != Domain.Enums.EntityType.ProductionCompany || currentUser.EntityId != sr.ProductionCompanyId)
+        // Allow cancellation if caller is admin (ManageServiceRequests) OR the owning production company
+        var effective = GetEffectivePermissionIds(currentUser);
+        bool isAdmin = effective.Contains(ManageServiceRequestsPermissionId);
+
+        if (!isAdmin)
         {
-            throw new UnauthorizedAccessException("Only the owning production company may cancel this request.");
+            if (currentUser.EntityType != Domain.Enums.EntityType.ProductionCompany || currentUser.EntityId != sr.ProductionCompanyId)
+            {
+                throw new UnauthorizedAccessException("Only the owning production company may cancel this request.");
+            }
         }
 
         if (sr.Status != Domain.Enums.ServiceRequestStatus.PendingWorkerSelection)
         {
-            throw new InvalidOperationException("Cannot cancel the request after worker assignment fhas started.");
+            throw new InvalidOperationException("Cannot cancel the request after worker assignment has started.");
         }
 
         sr.Status = Domain.Enums.ServiceRequestStatus.Cancelled;

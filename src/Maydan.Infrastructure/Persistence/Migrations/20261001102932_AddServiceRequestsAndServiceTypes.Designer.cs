@@ -4,6 +4,7 @@ using Maydan.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Maydan.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MaydanDbContext))]
-    partial class MaydanDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001102932_AddServiceRequestsAndServiceTypes")]
+    partial class AddServiceRequestsAndServiceTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2036,7 +2039,7 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Property<int>("ProductionCompanyId")
                         .HasColumnType("int");
 
-                    b.Property<int>("ProjectId")
+                    b.Property<int>("ProjectTypeId")
                         .HasColumnType("int");
 
                     b.Property<bool>("ReminderSent")
@@ -2073,7 +2076,7 @@ namespace Maydan.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductionCompanyId");
 
-                    b.HasIndex("ProjectId");
+                    b.HasIndex("ProjectTypeId");
 
                     b.HasIndex("ServiceId");
 
@@ -2660,7 +2663,7 @@ namespace Maydan.Infrastructure.Persistence.Migrations
 
                     b.HasOne("Maydan.Domain.Entities.Project", "Project")
                         .WithMany()
-                        .HasForeignKey("ProjectId")
+                        .HasForeignKey("ProjectTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

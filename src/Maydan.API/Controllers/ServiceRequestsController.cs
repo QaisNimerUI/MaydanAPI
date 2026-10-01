@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using FluentValidation;
+using FluentValidation.Results;
 using Maydan.Application.DTOs.ServiceRequests;
 using Maydan.Application.Interfaces;
 
@@ -10,10 +12,12 @@ namespace Maydan.API.Controllers;
 public class ServiceRequestsController : ApiControllerBase
 {
     private readonly IServiceRequestService _serviceRequestService;
+    private readonly IValidator<CreateServiceRequestDto> _createValidator;
 
-    public ServiceRequestsController(IServiceRequestService serviceRequestService)
+    public ServiceRequestsController(IServiceRequestService serviceRequestService, IValidator<CreateServiceRequestDto> createValidator)
     {
         _serviceRequestService = serviceRequestService;
+        _createValidator = createValidator;
     }
 
     [HttpGet("resolve-association")]

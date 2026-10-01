@@ -16,21 +16,21 @@ public class CreateServiceRequestDtoValidator : AbstractValidator<CreateServiceR
         RuleFor(x => x.AttendanceFrequency).GreaterThan(0).WithMessage("Attendance frequency must be greater than zero.");
         RuleFor(x => x.CityId).GreaterThan(0).WithMessage("City is required.");
         // Latitude/Longitude are optional if the Association for the CityId has coordinates; otherwise they are required.
-        RuleFor(x => x).MustAsync(async (dto, ct) =>
-        {
-            if (dto.Latitude.HasValue && dto.Longitude.HasValue)
-            {
-                return true;
-            }
+        //RuleFor(x => x).MustAsync(async (dto, ct) =>
+        //{
+        //    if (dto.Latitude.HasValue && dto.Longitude.HasValue)
+        //    {
+        //        return true;
+        //    }
 
-            // find association for the city
-            var associations = await unitOfWork.Associations.GetAllAsync(ct);
-            var assoc = associations.FirstOrDefault(a => a.CityId == dto.CityId);
-            if (assoc == null) return false;
+        //    // find association for the city
+        //    var associations = await unitOfWork.Associations.GetAllAsync(ct);
+        //    var assoc = associations.FirstOrDefault(a => a.CityId == dto.CityId);
+        //    if (assoc == null) return false;
 
-            // association must have coordinates if dto doesn't
-            return assoc.Latitude.HasValue && assoc.Longitude.HasValue;
-        }).WithMessage("Latitude and Longitude are required if the association for the selected city has no coordinates or no association is found.");
+        //    // association must have coordinates if dto doesn't
+        //    return assoc.Latitude.HasValue && assoc.Longitude.HasValue;
+        //}).WithMessage("Latitude and Longitude are required if the association for the selected city has no coordinates or no association is found.");
 
         // Ensure the Start/End dates do not exceed the Project duration
         RuleFor(x => x).MustAsync(async (dto, ct) =>
