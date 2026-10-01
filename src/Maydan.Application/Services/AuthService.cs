@@ -91,6 +91,10 @@ public class AuthService : IAuthService
         {
             throw new InvalidOperationException("Email, current password, and new password are required.");
         }
+        if (dto.NewPassword.Length < 8)
+        {
+            throw new InvalidOperationException("Password must be at least 8 characters.");
+        }
 
         var email = dto.Email.Trim();
         var user = await _unitOfWork.Users.GetByEmailWithAccessAsync(email, cancellationToken);
@@ -158,7 +162,10 @@ public class AuthService : IAuthService
         {
             throw new InvalidOperationException("Email is required.");
         }
-
+        if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(dto.Email))
+        {
+            throw new InvalidOperationException("Invalid email address format.");
+        }
         const string genericMessage = "If an account with that email exists, a password reset link has been sent to it.";
 
         var email = dto.Email.Trim();
@@ -222,6 +229,10 @@ public class AuthService : IAuthService
         {
             throw new InvalidOperationException("New password and confirmation do not match.");
         }
+        if (dto.NewPassword.Length < 8)
+        {
+            throw new InvalidOperationException("Password must be at least 8 characters.");
+        }
 
         // TokenHash is a salted hash (same IPasswordHasher format as passwords), so it can't be
         // looked up by direct equality — the same raw token hashes differently every time it's
@@ -230,6 +241,8 @@ public class AuthService : IAuthService
         // forgot-password request, most already used or expired) keeps it cheap in practice.
         var candidates = await _unitOfWork.PasswordResetTokens.GetAllAsync(cancellationToken);
         var matched = candidates.FirstOrDefault(t => _passwordHasher.VerifyPassword(dto.Token, t.TokenHash));
+
+
 
         if (matched is null)
         {
