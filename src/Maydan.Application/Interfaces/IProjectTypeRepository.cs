@@ -1,11 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Maydan.Domain.Entities;
 
-namespace Maydan.Application.Interfaces
+namespace Maydan.Application.Interfaces;
+
+public interface IProjectTypeRepository
 {
+
     public interface IProjectTypeRepository
     {
         Task<bool> ExistsAsync(
@@ -15,4 +14,12 @@ namespace Maydan.Application.Interfaces
         Task<List<Maydan.Domain.Entities.ProjectType>> GetAllAsync(
             CancellationToken cancellationToken = default);
     }
+
+    Task<bool> ExistsAsync(
+        int projectTypeId,
+        CancellationToken cancellationToken = default);
+
+
+    Task<List<ProjectType>> GetAllAsync(
+        CancellationToken cancellationToken = default);
 }

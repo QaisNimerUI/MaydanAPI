@@ -26,17 +26,23 @@ public class MaydanDbContext : DbContext
 
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<City> Cities => Set<City>();
+    public DbSet<CityLocation> CityLocations => Set<CityLocation>();
     public DbSet<ProjectType> ProjectTypes { get; set; }
     public DbSet<Association> Associations => Set<Association>();
+    public DbSet<AssociationProjectSupervisor> AssociationProjectSupervisors => Set<AssociationProjectSupervisor>();
     public DbSet<ProductionCompany> ProductionCompanies => Set<ProductionCompany>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Worker> Workers => Set<Worker>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MaydanDbContext).Assembly);
 
         ProjectTypeSeed.Seed(modelBuilder);
+        LocationSeed.Seed(modelBuilder);
 
         // Global soft-delete filter for every SharedEntities (IsDeleted set by SaveChangesAsync below).
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

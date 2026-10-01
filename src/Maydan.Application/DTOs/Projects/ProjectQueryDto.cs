@@ -1,5 +1,6 @@
 namespace Maydan.Application.DTOs.Projects;
 
+
 public class ProjectQueryDto
 {
     public bool IsDeleted { get; set; }

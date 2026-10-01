@@ -17,8 +17,11 @@ public class CountryRepository : ICountryRepository
     public Task<Country?> GetByIdAsync(int countryId, CancellationToken cancellationToken = default) =>
         _context.Countries.FirstOrDefaultAsync(c => c.Id == countryId, cancellationToken);
 
+    public Task<Country?> GetByIdIncludingDeletedAsync(int countryId, CancellationToken cancellationToken = default) =>
+        _context.Countries.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == countryId, cancellationToken);
+
     public Task<List<Country>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        _context.Countries.ToListAsync(cancellationToken);
+        _context.Countries.IgnoreQueryFilters().AsNoTracking().OrderBy(c => c.EnglishName).ToListAsync(cancellationToken);
 
     public async Task AddAsync(Country country, CancellationToken cancellationToken = default) =>
         await _context.Countries.AddAsync(country, cancellationToken);

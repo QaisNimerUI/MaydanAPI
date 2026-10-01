@@ -1,12 +1,17 @@
 using System.Text;
 using FluentValidation;
+using Maydan.API.Filters;
 using Maydan.API.Security;
 using Maydan.Application.Interfaces;
 using Maydan.Application.Services;
+using Maydan.Infrastructure.Email;
 using Maydan.Infrastructure.Persistence;
 using Maydan.Infrastructure.Repositories;
 using Maydan.Infrastructure.Security;
 using Maydan.Infrastructure.Storage;
+
+using Maydan.Infrastructure.Web;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -15,7 +20,8 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 
-builder.Services.AddControllers();
+
+builder.Services.AddControllers(options => options.Filters.Add<SystemConfigurationGateFilter>());
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -44,8 +50,23 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<ILocationService, LocationService>();
+builder.Services.AddScoped<IAssociationService, AssociationService>();
+builder.Services.AddScoped<IAssociationProjectSupervisorService, AssociationProjectSupervisorService>();
+builder.Services.AddScoped<IProductionCompanyService, ProductionCompanyService>();
+builder.Services.AddScoped<IProductionCompanyOnboardingService, ProductionCompanyOnboardingService>();
+builder.Services.AddScoped<IEntityOnboardingService, EntityOnboardingService>();
+builder.Services.AddScoped<IFrontendLinkBuilder, FrontendLinkBuilder>();
+
+builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+
+
+builder.Services.AddDataProtection();
+builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
+builder.Services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
+builder.Services.AddScoped<ISystemConfigurationGateService, SystemConfigurationGateService>();
+builder.Services.AddScoped<IServiceConfigurationService, ServiceConfigurationService>();
 
 var uploadsRootPath = Path.Combine(
     builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"),
@@ -55,9 +76,14 @@ builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(u
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
+
+var uploadsRootPath = Path.Combine(
+    builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"),
+    "uploads");
+builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsRootPath));
+
 builder.Services.AddValidatorsFromAssembly(typeof(Maydan.Application.AssemblyReference).Assembly);
 
-// CORS — origins come from per-environment config (section 1: Dev/QA/Staging each need their own allowed origin).
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 builder.Services.AddCors(options =>
 {
@@ -93,6 +119,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+
 
 app.UseStaticFiles();
 

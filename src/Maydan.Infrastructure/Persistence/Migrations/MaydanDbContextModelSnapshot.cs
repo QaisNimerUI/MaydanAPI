@@ -88,6 +88,47 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.ToTable("Associations", (string)null);
                 });
 
+            modelBuilder.Entity("Maydan.Domain.Entities.AssociationProjectSupervisor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AssociationProjectSupervisors", (string)null);
+                });
+
             modelBuilder.Entity("Maydan.Domain.Entities.City", b =>
                 {
                     b.Property<int>("Id")
@@ -132,6 +173,162 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.HasIndex("CountryId");
 
                     b.ToTable("Cities", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ArabicName = "عمان",
+                            CountryId = 1,
+                            EnglishName = "Amman",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 2,
+                            ArabicName = "إربد",
+                            CountryId = 1,
+                            EnglishName = "Irbid",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 3,
+                            ArabicName = "الزرقاء",
+                            CountryId = 1,
+                            EnglishName = "Zarqa",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 4,
+                            ArabicName = "البلقاء",
+                            CountryId = 1,
+                            EnglishName = "Balqa",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 5,
+                            ArabicName = "مأدبا",
+                            CountryId = 1,
+                            EnglishName = "Madaba",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 6,
+                            ArabicName = "الكرك",
+                            CountryId = 1,
+                            EnglishName = "Karak",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 7,
+                            ArabicName = "الطفيلة",
+                            CountryId = 1,
+                            EnglishName = "Tafilah",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 8,
+                            ArabicName = "معان",
+                            CountryId = 1,
+                            EnglishName = "Ma'an",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 9,
+                            ArabicName = "العقبة",
+                            CountryId = 1,
+                            EnglishName = "Aqaba",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 10,
+                            ArabicName = "جرش",
+                            CountryId = 1,
+                            EnglishName = "Jerash",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 11,
+                            ArabicName = "عجلون",
+                            CountryId = 1,
+                            EnglishName = "Ajloun",
+                            IsActive = true,
+                            IsDeleted = false
+                        },
+                        new
+                        {
+                            Id = 12,
+                            ArabicName = "المفرق",
+                            CountryId = 1,
+                            EnglishName = "Mafraq",
+                            IsActive = true,
+                            IsDeleted = false
+                        });
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.CityLocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ArabicName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("CityId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EnglishName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CityId");
+
+                    b.ToTable("CityLocations", (string)null);
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Country", b =>
@@ -173,6 +370,16 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Countries", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ArabicName = "الأردن",
+                            EnglishName = "Jordan",
+                            IsActive = true,
+                            IsDeleted = false
+                        });
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Group", b =>
@@ -251,6 +458,60 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.ToTable("GroupPermissions", (string)null);
                 });
 
+            modelBuilder.Entity("Maydan.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsUsed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens", (string)null);
+                });
+
             modelBuilder.Entity("Maydan.Domain.Entities.Permission", b =>
                 {
                     b.Property<int>("PermissionId")
@@ -304,6 +565,476 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Permissions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            PermissionId = 1,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Users",
+                            PermissionNameAr = "عرض المستخدمين",
+                            PermissionNameEn = "View Users",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 2,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Users",
+                            PermissionNameAr = "إنشاء المستخدمين",
+                            PermissionNameEn = "Create Users",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 3,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Users",
+                            PermissionNameAr = "إدارة المستخدمين",
+                            PermissionNameEn = "Manage Users",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 4,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Groups",
+                            PermissionNameAr = "عرض المجموعات",
+                            PermissionNameEn = "View Groups",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 5,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Groups",
+                            PermissionNameAr = "إنشاء المجموعات",
+                            PermissionNameEn = "Create Groups",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 6,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Groups",
+                            PermissionNameAr = "تعديل المجموعات",
+                            PermissionNameEn = "Edit Groups",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 7,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Groups",
+                            PermissionNameAr = "حذف المجموعات",
+                            PermissionNameEn = "Delete Groups",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 8,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Groups",
+                            PermissionNameAr = "إدارة المجموعات",
+                            PermissionNameEn = "Manage Groups",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 9,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "عرض الجمعيات",
+                            PermissionNameEn = "View Associations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 10,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "إنشاء الجمعيات",
+                            PermissionNameEn = "Create Associations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 11,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "تعديل الجمعيات",
+                            PermissionNameEn = "Edit Associations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 12,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "حذف الجمعيات",
+                            PermissionNameEn = "Delete Associations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 13,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "إدارة الجمعيات",
+                            PermissionNameEn = "Manage Associations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 14,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "عرض مستخدمي الجمعيات",
+                            PermissionNameEn = "View Association Users",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 15,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ServiceRequests",
+                            PermissionNameAr = "طلب خدمة",
+                            PermissionNameEn = "Request Service",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 16,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ServiceRequests",
+                            PermissionNameAr = "عرض طلبات الخدمة",
+                            PermissionNameEn = "View Service Requests",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 17,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ServiceRequests",
+                            PermissionNameAr = "إدارة طلبات الخدمة",
+                            PermissionNameEn = "Manage Service Requests",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 18,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ServiceRequests",
+                            PermissionNameAr = "إدارة الخدمات",
+                            PermissionNameEn = "Manage Services",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 19,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ProductionCompanies",
+                            PermissionNameAr = "عرض شركات الإنتاج",
+                            PermissionNameEn = "View Production Companies",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 20,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ProductionCompanies",
+                            PermissionNameAr = "إدارة شركات الإنتاج",
+                            PermissionNameEn = "Manage Production Companies",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 21,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ProductionHouses",
+                            PermissionNameAr = "عرض بيوت الإنتاج",
+                            PermissionNameEn = "View Production Houses",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 22,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "ProductionHouses",
+                            PermissionNameAr = "إدارة بيوت الإنتاج",
+                            PermissionNameEn = "Manage Production Houses",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 23,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Workers",
+                            PermissionNameAr = "عرض العمال",
+                            PermissionNameEn = "View Workers",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 24,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Workers",
+                            PermissionNameAr = "إدارة العمال",
+                            PermissionNameEn = "Manage Workers",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 25,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Projects",
+                            PermissionNameAr = "عرض المشاريع",
+                            PermissionNameEn = "View Projects",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 26,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Projects",
+                            PermissionNameAr = "إنشاء المشاريع",
+                            PermissionNameEn = "Create Projects",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 27,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Projects",
+                            PermissionNameAr = "تعديل المشاريع",
+                            PermissionNameEn = "Edit Projects",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 28,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Projects",
+                            PermissionNameAr = "حذف المشاريع",
+                            PermissionNameEn = "Delete Projects",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 29,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Projects",
+                            PermissionNameAr = "مراجعة المشاريع",
+                            PermissionNameEn = "Review Projects",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 30,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Projects",
+                            PermissionNameAr = "إدارة المشاريع",
+                            PermissionNameEn = "Manage Projects",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 31,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Locations",
+                            PermissionNameAr = "عرض المواقع",
+                            PermissionNameEn = "View Locations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 32,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Locations",
+                            PermissionNameAr = "إدارة المواقع",
+                            PermissionNameEn = "Manage Locations",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 33,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Attendance",
+                            PermissionNameAr = "عرض الحضور",
+                            PermissionNameEn = "View Attendance",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 34,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Attendance",
+                            PermissionNameAr = "إدارة الحضور",
+                            PermissionNameEn = "Manage Attendance",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 35,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Payments",
+                            PermissionNameAr = "عرض الرواتب",
+                            PermissionNameEn = "View Payments",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 36,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Payments",
+                            PermissionNameAr = "إدارة الرواتب",
+                            PermissionNameEn = "Manage Payments",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 37,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Onboarding",
+                            PermissionNameAr = "استيعاب الجهات",
+                            PermissionNameEn = "Onboard Entities",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 38,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "SystemConfiguration",
+                            PermissionNameAr = "إدارة إعدادات النظام",
+                            PermissionNameEn = "Manage System Configuration",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            PermissionId = 39,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            Module = "Associations",
+                            PermissionNameAr = "إدارة مستخدمي الجمعيات",
+                            PermissionNameEn = "Manage Association Users",
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.ProductionCompany", b =>
@@ -318,6 +1049,9 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("CityId")
+                        .HasColumnType("int");
 
                     b.Property<string>("ContactEmail")
                         .HasMaxLength(200)
@@ -356,10 +1090,20 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CityId");
+
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique();
 
                     b.ToTable("ProductionCompanies", (string)null);
                 });
@@ -610,6 +1354,63 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Maydan.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRevoked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int?>("ReplacedByTokenId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens", (string)null);
+                });
+
             modelBuilder.Entity("Maydan.Domain.Entities.Role", b =>
                 {
                     b.Property<int>("RoleId")
@@ -722,6 +1523,548 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.HasIndex("PermissionId");
 
                     b.ToTable("RolePermissions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 1,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 2,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 3,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 4,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 5,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 6,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 7,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 8,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 9,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 10,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 11,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 12,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 13,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 14,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 15,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 16,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 17,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 18,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 19,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 20,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 21,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 22,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 23,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 24,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 25,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 26,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 27,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 28,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 29,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 30,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 31,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 32,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 33,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 34,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 35,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 36,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 37,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 38,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 1,
+                            PermissionId = 39,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 1,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 2,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 14,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 22,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 18,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 4,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 2,
+                            PermissionId = 8,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 1,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 25,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 26,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 27,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 15,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 16,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 23,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 4,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 8,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 33,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 34,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 35,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            PermissionId = 36,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 1,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 9,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 11,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 24,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 18,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 14,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 39,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 4,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 8,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 33,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 34,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            RoleId = 4,
+                            PermissionId = 35,
+                            IsActive = true
+                        });
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.Service", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CalculationType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NameAr")
+                        .IsUnique();
+
+                    b.HasIndex("NameEn")
+                        .IsUnique();
+
+                    b.ToTable("Services", (string)null);
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.SystemConfiguration", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SenderDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SenderEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("SmtpHost")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("SmtpPasswordProtected")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("SmtpPort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SmtpUsername")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SystemConfigurations", (string)null);
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.User", b =>
@@ -826,9 +2169,69 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                             LastNameAr = "الكردي",
                             LastNameEn = "Al-Kurdi",
                             MustResetPassword = false,
-                            PasswordHash = "PBKDF2-SHA256.100000.Yil011Rar6X/CCTuFMwT7w==.ClYpfJnPTPSooq0QEiIiMwl0qlPe5xp3LPkjYjNcX10=",
+                            PasswordHash = "PBKDF2-SHA256.100000.kr2Do1moATCbhMGahUAANg==.2I1SQILgcLQCpWA+3XSAEXhoilqTklMJh0t7BV2LKxo=",
                             PhoneNumber = "+962770000023",
                             RoleId = 1,
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "aseza-admin@aseza.jo",
+                            EntityId = 1,
+                            EntityType = "Aseza",
+                            FirstNameAr = "أسيزا",
+                            FirstNameEn = "Aseza",
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            LastNameAr = "أدمن",
+                            LastNameEn = "Admin",
+                            MustResetPassword = false,
+                            PasswordHash = "PBKDF2-SHA256.100000.NMQd4g85bDIwAs//rBeXvw==.haZXxr9bl/ZmbtsVxJH5pBI2Tz5x42PyO004Wsuv3bo=",
+                            PhoneNumber = "+962770000024",
+                            RoleId = 2,
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            UserId = 1001,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "association-tester@example.org",
+                            EntityId = 1,
+                            EntityType = "Association",
+                            FirstNameAr = "جمعية",
+                            FirstNameEn = "Association",
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            LastNameAr = "اختبار",
+                            LastNameEn = "Tester",
+                            MustResetPassword = false,
+                            PasswordHash = "PBKDF2-SHA256.100000.Neiqo3DL9KA6VnPDZZgaWQ==.euR5zQ/Skjf64sJn7SnvR/IDgkd5c/CgJLLfx9HjaXU=",
+                            PhoneNumber = "+962770000025",
+                            RoleId = 4,
+                            UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            UserId = 1003,
+                            CreatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "production-tester@example.org",
+                            EntityId = 1,
+                            EntityType = "ProductionCompany",
+                            FirstNameAr = "شركة",
+                            FirstNameEn = "Production",
+                            Id = 0,
+                            IsActive = true,
+                            IsDeleted = false,
+                            LastNameAr = "اختبار",
+                            LastNameEn = "Tester",
+                            MustResetPassword = false,
+                            PasswordHash = "PBKDF2-SHA256.100000.7DqYchDowXom9IfwCgW+4g==.d41vmNOYVi3nthYMOioczS+W871M/cTKq6Ps58ISAcg=",
+                            PhoneNumber = "+962770000026",
+                            RoleId = 3,
                             UpdatedAt = new DateTime(2026, 9, 7, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
@@ -885,6 +2288,50 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.HasIndex("PermissionId");
 
                     b.ToTable("UserPermissions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 9,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 19,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 21,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 23,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 25,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 33,
+                            IsActive = true
+                        },
+                        new
+                        {
+                            UserId = 1000,
+                            PermissionId = 35,
+                            IsActive = true
+                        });
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Worker", b =>
@@ -978,6 +2425,25 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Navigation("City");
                 });
 
+            modelBuilder.Entity("Maydan.Domain.Entities.AssociationProjectSupervisor", b =>
+                {
+                    b.HasOne("Maydan.Domain.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Maydan.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Maydan.Domain.Entities.City", b =>
                 {
                     b.HasOne("Maydan.Domain.Entities.Country", "Country")
@@ -987,6 +2453,17 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.CityLocation", b =>
+                {
+                    b.HasOne("Maydan.Domain.Entities.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("City");
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.GroupPermission", b =>
@@ -1006,6 +2483,28 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("Permission");
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("Maydan.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.ProductionCompany", b =>
+                {
+                    b.HasOne("Maydan.Domain.Entities.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("City");
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Project", b =>
@@ -1041,6 +2540,17 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductionCompany");
 
                     b.Navigation("ProjectType");
+                });
+
+            modelBuilder.Entity("Maydan.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("Maydan.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.RolePermission", b =>
