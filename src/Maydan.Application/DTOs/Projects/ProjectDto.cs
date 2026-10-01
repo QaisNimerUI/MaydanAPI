@@ -25,4 +25,6 @@ public class ProjectDto
     public string WorkPermitImagePath { get; set; } = string.Empty;
 
     public int ProductionCompanyId { get; set; }
+
+    public bool IsDeleted { get; set; }
 }

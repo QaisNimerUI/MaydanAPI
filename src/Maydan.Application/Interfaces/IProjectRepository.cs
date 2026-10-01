@@ -8,8 +8,21 @@ public interface IProjectRepository
         int projectId,
         CancellationToken cancellationToken = default);
 
+    Task<Project?> GetByIdIncludingDeletedAsync(
+        int projectId,
+        CancellationToken cancellationToken = default);
+
     Task<List<Project>> GetByProductionCompanyIdAsync(
         int productionCompanyId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<Project>> GetAllAsync(
+        bool isDeleted,
+        string? searchTerm,
+        DateTime? startDate,
+        DateTime? endDate,
+        string? searchByProductionCompanyName,
+        int? searchByProductionCompanyId,
         CancellationToken cancellationToken = default);
 
     Task AddAsync(

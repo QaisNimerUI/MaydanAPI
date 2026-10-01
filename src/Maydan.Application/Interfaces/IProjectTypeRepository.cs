@@ -11,5 +11,8 @@ namespace Maydan.Application.Interfaces
         Task<bool> ExistsAsync(
             int projectTypeId,
             CancellationToken cancellationToken = default);
+
+        Task<List<Maydan.Domain.Entities.ProjectType>> GetAllAsync(
+            CancellationToken cancellationToken = default);
     }
 }

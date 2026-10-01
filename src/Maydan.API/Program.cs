@@ -6,6 +6,7 @@ using Maydan.Application.Services;
 using Maydan.Infrastructure.Persistence;
 using Maydan.Infrastructure.Repositories;
 using Maydan.Infrastructure.Security;
+using Maydan.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -45,6 +46,11 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 builder.Services.AddScoped<IProjectService, ProjectService>();
+
+var uploadsRootPath = Path.Combine(
+    builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"),
+    "uploads");
+builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsRootPath));
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -87,6 +93,8 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+
+app.UseStaticFiles();
 
 app.UseCors("Frontend");
 

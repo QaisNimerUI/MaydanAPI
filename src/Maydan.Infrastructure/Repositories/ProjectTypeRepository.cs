@@ -1,4 +1,5 @@
-﻿using Maydan.Application.Interfaces;
+using Maydan.Application.Interfaces;
+using Maydan.Domain.Entities;
 using Maydan.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,5 +22,15 @@ public class ProjectTypeRepository : IProjectTypeRepository
             x => x.Id == projectTypeId &&
                  x.IsActive,
             cancellationToken);
+    }
+
+    public Task<List<ProjectType>> GetAllAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return _context.ProjectTypes
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.NameEn)
+            .ToListAsync(cancellationToken);
     }
 }
