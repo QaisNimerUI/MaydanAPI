@@ -72,6 +72,8 @@ builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>()
 builder.Services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
 builder.Services.AddScoped<ISystemConfigurationGateService, SystemConfigurationGateService>();
 builder.Services.AddScoped<IServiceConfigurationService, ServiceConfigurationService>();
+builder.Services.AddScoped<IServiceRequestService, ServiceRequestService>();
+builder.Services.AddHostedService<Maydan.API.HostedServices.ServiceRequestReminderHostedService>();
 
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();

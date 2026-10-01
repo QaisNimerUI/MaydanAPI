@@ -37,6 +37,11 @@ public class MaydanDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
 
+    public DbSet<Service> ServiceTypes => Set<Service>();
+    public DbSet<ServiceRequest> ServiceRequests => Set<ServiceRequest>();
+
+
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MaydanDbContext).Assembly);
