@@ -17,8 +17,24 @@ namespace Maydan.Application.Services;
 // NOTE (deliberately out of scope): linking a Project to Locations/Associations is blocked on the
 // GIS team providing real location data — no field, table, or DTO for that exists here, and none
 // should be added until that data is available.
+//
+// Secure project access and management: every action now resolves the caller's effective
+// permissions (ViewProjects/CreateProjects/EditProjects/DeleteProjects/ReviewProjects/
+// ManageProjects — PermissionSeedConfiguration.cs ids 25-30) rather than only checking
+// "is this a Production Company user" — oversight roles (Bayt-AlUrdon/ASEZA) can now view across
+// every company's projects via the plain View/Review/Manage permissions, while a Production
+// Company user stays scoped to its own company's projects (CanViewProject below), with its own
+// Producer/Location Manager on a project always able to view that one project even without a
+// blanket Projects permission.
 public class ProjectService : IProjectService
 {
+    private const int ViewProjectsPermissionId = 25;
+    private const int CreateProjectsPermissionId = 26;
+    private const int EditProjectsPermissionId = 27;
+    private const int DeleteProjectsPermissionId = 28;
+    private const int ReviewProjectsPermissionId = 29;
+    private const int ManageProjectsPermissionId = 30;
+
     private readonly IUnitOfWork _unitOfWork;
 
     public ProjectService(IUnitOfWork unitOfWork)
@@ -31,7 +47,8 @@ public class ProjectService : IProjectService
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+        var currentUser = await GetCurrentUserWithPermissionsAsync(currentUserId, cancellationToken);
+        EnsureHasAnyProjectPermission(currentUser, CreateProjectsPermissionId, ManageProjectsPermissionId);
 
         if (currentUser.EntityType != EntityType.ProductionCompany)
         {
@@ -85,9 +102,12 @@ public class ProjectService : IProjectService
     }
 
     public async Task<List<ProjectDto>> GetAllAsync(
+        int currentUserId,
         ProjectQueryDto query,
         CancellationToken cancellationToken = default)
     {
+        var currentUser = await GetCurrentUserWithPermissionsAsync(currentUserId, cancellationToken);
+
         var projects = await _unitOfWork.Projects.GetAllAsync(
             query.IsDeleted,
             query.SearchTerm,
@@ -97,15 +117,26 @@ public class ProjectService : IProjectService
             query.SearchByProductionCompanyId,
             cancellationToken);
 
-        return projects.Select(MapToDto).ToList();
+        return projects
+            .Where(project => CanViewProject(currentUser, project))
+            .Select(MapToDto)
+            .ToList();
     }
 
     public async Task<ProjectDto> GetByIdAsync(
+        int currentUserId,
         int id,
         CancellationToken cancellationToken = default)
     {
+        var currentUser = await GetCurrentUserWithPermissionsAsync(currentUserId, cancellationToken);
+
         var project = await _unitOfWork.Projects.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Project was not found.");
+
+        if (!CanViewProject(currentUser, project))
+        {
+            throw new UnauthorizedAccessException("Cannot view a project outside the caller's authorized scope.");
+        }
 
         return MapToDto(project);
     }
@@ -116,7 +147,8 @@ public class ProjectService : IProjectService
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+        var currentUser = await GetCurrentUserWithPermissionsAsync(currentUserId, cancellationToken);
+        EnsureHasAnyProjectPermission(currentUser, EditProjectsPermissionId, ManageProjectsPermissionId);
 
         var project = await _unitOfWork.Projects.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Project was not found.");
@@ -166,7 +198,8 @@ public class ProjectService : IProjectService
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+        var currentUser = await GetCurrentUserWithPermissionsAsync(currentUserId, cancellationToken);
+        EnsureHasAnyProjectPermission(currentUser, DeleteProjectsPermissionId, ManageProjectsPermissionId);
 
         var project = await _unitOfWork.Projects.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Project was not found.");
@@ -185,7 +218,8 @@ public class ProjectService : IProjectService
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var currentUser = await GetCurrentUserAsync(currentUserId, cancellationToken);
+        var currentUser = await GetCurrentUserWithPermissionsAsync(currentUserId, cancellationToken);
+        EnsureHasAnyProjectPermission(currentUser, DeleteProjectsPermissionId, ManageProjectsPermissionId);
 
         // GetByIdAsync would never find this project — the global soft-delete query filter
         // excludes it precisely because it's deleted. GetByIdIncludingDeletedAsync bypasses that.
@@ -217,9 +251,9 @@ public class ProjectService : IProjectService
             .ToList();
     }
 
-    private async Task<User> GetCurrentUserAsync(int currentUserId, CancellationToken cancellationToken)
+    private async Task<User> GetCurrentUserWithPermissionsAsync(int currentUserId, CancellationToken cancellationToken)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
+        var user = await _unitOfWork.Users.GetWithPermissionsAsync(currentUserId, cancellationToken)
             ?? throw new UnauthorizedAccessException("Current user was not found.");
 
         if (!user.IsActive)
@@ -228,6 +262,68 @@ public class ProjectService : IProjectService
         }
 
         return user;
+    }
+
+    private static void EnsureHasAnyProjectPermission(User user, params int[] permissionIds)
+    {
+        if (!GetEffectivePermissionIds(user).Overlaps(permissionIds))
+        {
+            throw new UnauthorizedAccessException("Caller does not hold the required Projects permission.");
+        }
+    }
+
+    // Oversight roles (Bayt-AlUrdon/ASEZA) see every project as long as they hold one of the
+    // View/Review/Manage permissions. A Production Company user is scoped to its own company's
+    // projects, and within that company a project's own Producer/Location Manager can always view
+    // it even without holding a blanket Projects permission — mirrors how Association's own
+    // service-request self-view works for its own narrower participants.
+    private static bool CanViewProject(User currentUser, Project project)
+    {
+        var permissionIds = GetEffectivePermissionIds(currentUser);
+        var hasAllProjectsPermission = permissionIds.Overlaps(new[]
+        {
+            ViewProjectsPermissionId,
+            ReviewProjectsPermissionId,
+            ManageProjectsPermissionId
+        });
+
+        if (currentUser.EntityType is EntityType.BaytAlUrdon or EntityType.Aseza)
+        {
+            return hasAllProjectsPermission;
+        }
+
+        if (currentUser.EntityType != EntityType.ProductionCompany)
+        {
+            return false;
+        }
+
+        if (project.ProductionCompanyId != currentUser.EntityId)
+        {
+            return false;
+        }
+
+        return hasAllProjectsPermission ||
+            project.ProducerUserId == currentUser.UserId ||
+            project.LocationManagerUserId == currentUser.UserId;
+    }
+
+    private static HashSet<int> GetEffectivePermissionIds(User user)
+    {
+        var rolePermissionIds = user.Role.RolePermissions
+            .Where(rp => rp.IsActive && rp.Permission.IsActive)
+            .Select(rp => rp.PermissionId);
+
+        var directPermissionIds = user.UserPermissions
+            .Where(up => up.IsActive && up.Permission.IsActive)
+            .Select(up => up.PermissionId);
+
+        var groupPermissionIds = user.UserGroups
+            .Where(ug => ug.Group.IsActive)
+            .SelectMany(ug => ug.Group.GroupPermissions)
+            .Where(gp => gp.IsActive && gp.Permission.IsActive)
+            .Select(gp => gp.PermissionId);
+
+        return rolePermissionIds.Concat(directPermissionIds).Concat(groupPermissionIds).ToHashSet();
     }
 
     // Shared by CreateAsync/UpdateAsync — the same field-level validation both need.
