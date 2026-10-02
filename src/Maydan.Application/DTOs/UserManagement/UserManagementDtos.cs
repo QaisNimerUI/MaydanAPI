@@ -8,12 +8,18 @@ public record PermissionDto(
     string PermissionNameAr,
     string Module);
 
+// MAYD-31: PermissionsPreview added — the real ticket asks for "a preview of permission chips" on
+// each card, not just a count. Capped at PermissionSummaryPreviewSize (4, matching the old mock UI's
+// "4 chips + N more" pattern the frontend's own dormant `groupsList.more` i18n key was already
+// prepared for) — see UserManagementService.MapGroupSummary for how it's populated in the same
+// query as PermissionCount, not a second per-group fetch.
 public record GroupSummaryDto(
     int GroupId,
     string GroupNameEn,
     string GroupNameAr,
     int PermissionCount,
-    int UserCount);
+    int UserCount,
+    List<PermissionDto> PermissionsPreview);
 
 public record GroupDetailsDto(
     int GroupId,
@@ -37,6 +43,15 @@ public record UserSummaryDto(
     string RoleNameAr,
     bool MustResetPassword,
     bool IsActive);
+
+// MAYD-20: real paginated list contract — matches the BRD's own explicit response shape
+// (`{ items, totalCount, page, pageSize }`, see Claude outputs/maydan-backend-requirements.md
+// section 1.2 in the frontend repo) exactly, camelCase over the wire same as every other DTO here.
+public record PagedUsersDto(
+    List<UserSummaryDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
 
 public record UserDetailsDto(
     int UserId,
@@ -79,6 +94,12 @@ public class CreateEntityUserDto
     public int RoleId { get; set; }
     public List<int> PermissionIds { get; set; } = new();
     public List<int> GroupIds { get; set; } = new();
+
+    // Association Management, Phase 2b: optional real-association override for a cross-entity
+    // Association-role create (Bayt-AlUrdon only — see EnsureSameEntityCreation). Null (every
+    // existing caller, and every non-Association-role create) keeps the exact prior placeholder-1
+    // behavior — see UserManagementService.ResolveEntityForRoleAsync's own comment.
+    public int? EntityId { get; set; }
 }
 
 public class CreateGroupDto
@@ -105,4 +126,9 @@ public class UpdateUserPermissionsDto
 public class UpdateUserGroupsDto
 {
     public List<int> GroupIds { get; set; } = new();
+}
+
+public class UpdateUserStatusDto
+{
+    public bool IsActive { get; set; }
 }

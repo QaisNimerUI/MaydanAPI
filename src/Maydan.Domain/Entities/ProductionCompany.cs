@@ -11,5 +11,12 @@ public class ProductionCompany : SharedEntities
     public string? ContactEmail { get; set; }
     public bool IsSelfRegistered { get; set; }
 
+    // Entity onboarding Stage 1 (2026-09-22): the public self-registration form collects both, so
+    // they're persisted rather than dropped. RegistrationNumber is enforced unique (confirmed
+    // product decision) — see ProductionCompanyConfiguration. CityId mirrors Association.CityId/City.
+    public string RegistrationNumber { get; set; } = string.Empty;
+    public int CityId { get; set; }
+    public City City { get; set; } = null!;
+
     public ICollection<Project> Projects { get; set; } = new List<Project>();
 }

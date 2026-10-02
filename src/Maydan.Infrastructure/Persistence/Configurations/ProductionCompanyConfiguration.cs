@@ -19,5 +19,16 @@ public class ProductionCompanyConfiguration : IEntityTypeConfiguration<Productio
         builder.Property(p => p.ContactEmail).HasMaxLength(200);
 
         builder.Property(p => p.IsSelfRegistered).HasDefaultValue(false);
+
+        // Entity onboarding Stage 1 (2026-09-22): added for the public production-company
+        // self-registration endpoint. RegistrationNumber unique per confirmed product decision —
+        // it identifies one real-world legal entity, so two self-registrations can't share it.
+        builder.Property(p => p.RegistrationNumber).IsRequired().HasMaxLength(50);
+        builder.HasIndex(p => p.RegistrationNumber).IsUnique();
+
+        builder.HasOne(p => p.City)
+            .WithMany()
+            .HasForeignKey(p => p.CityId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

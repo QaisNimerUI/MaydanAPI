@@ -23,6 +23,11 @@ public class WorkerRepository : IWorkerRepository
     public Task<List<Worker>> GetByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default) =>
         _context.Workers.Where(w => w.AssociationId == associationId).ToListAsync(cancellationToken);
 
+    public Task<List<Worker>> GetDeletedByAssociationIdAsync(int associationId, CancellationToken cancellationToken = default) =>
+        _context.Workers.IgnoreQueryFilters()
+            .Where(w => w.IsDeleted && w.AssociationId == associationId)
+            .ToListAsync(cancellationToken);
+
     public async Task AddAsync(Worker worker, CancellationToken cancellationToken = default) =>
         await _context.Workers.AddAsync(worker, cancellationToken);
 
