@@ -76,11 +76,7 @@ builder.Services.AddScoped<IServiceConfigurationService, ServiceConfigurationSer
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
-// Projects audit follow-up: no file-upload feature existed before this ticket, so no
-// wwwroot/static-files convention existed either. WebRootPath is null when wwwroot doesn't exist
-// on disk yet (first run) — falls back to ContentRootPath/wwwroot, which app.UseStaticFiles()
-// below will create/serve from the same place. Resolved here (not inside LocalFileStorageService
-// itself) so Maydan.Infrastructure stays free of any ASP.NET Core hosting reference.
+
 var uploadsRootPath = Path.Combine(
     builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"),
     "uploads");
