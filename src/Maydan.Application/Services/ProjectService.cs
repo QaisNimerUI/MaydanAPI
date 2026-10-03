@@ -5,27 +5,8 @@ using Maydan.Domain.Enums;
 
 namespace Maydan.Application.Services;
 
-// Projects audit follow-up: every validation failure in this class used to throw a bare
-// Exception, which ApiControllerBase.HandleException's switch has no case for — it always fell
-// through to the generic 500 branch regardless of whether the real problem was a 400 (bad
-// input/business rule) or a 404 (referenced entity not found). Every throw below now uses the
-// same exception-type convention UserManagementService already established:
-// InvalidOperationException for business-rule violations, KeyNotFoundException for "not found",
-// UnauthorizedAccessException for acting outside the caller's own entity boundary (mirrors
-// UserManagementService.GetScopedUserAsync()'s "Cannot manage users outside the current entity").
-//
-// NOTE (deliberately out of scope): linking a Project to Locations/Associations is blocked on the
-// GIS team providing real location data — no field, table, or DTO for that exists here, and none
-// should be added until that data is available.
-//
-// Secure project access and management: every action now resolves the caller's effective
-// permissions (ViewProjects/CreateProjects/EditProjects/DeleteProjects/ReviewProjects/
-// ManageProjects — PermissionSeedConfiguration.cs ids 25-30) rather than only checking
-// "is this a Production Company user" — oversight roles (Bayt-AlUrdon/ASEZA) can now view across
-// every company's projects via the plain View/Review/Manage permissions, while a Production
-// Company user stays scoped to its own company's projects (CanViewProject below), with its own
-// Producer/Location Manager on a project always able to view that one project even without a
-// blanket Projects permission.
+
+
 public class ProjectService : IProjectService
 {
     private const int ViewProjectsPermissionId = 25;
@@ -251,6 +232,20 @@ public class ProjectService : IProjectService
             .ToList();
     }
 
+
+    private async Task<User> GetCurrentUserAsync(int currentUserId, CancellationToken cancellationToken)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Current user was not found.");
+
+        if (!user.IsActive)
+        {
+            throw new UnauthorizedAccessException("Current user is inactive.");
+        }
+
+        return user;
+    }
+
     private async Task<User> GetCurrentUserWithPermissionsAsync(int currentUserId, CancellationToken cancellationToken)
     {
         var user = await _unitOfWork.Users.GetWithPermissionsAsync(currentUserId, cancellationToken)
@@ -272,11 +267,7 @@ public class ProjectService : IProjectService
         }
     }
 
-    // Oversight roles (Bayt-AlUrdon/ASEZA) see every project as long as they hold one of the
-    // View/Review/Manage permissions. A Production Company user is scoped to its own company's
-    // projects, and within that company a project's own Producer/Location Manager can always view
-    // it even without holding a blanket Projects permission — mirrors how Association's own
-    // service-request self-view works for its own narrower participants.
+
     private static bool CanViewProject(User currentUser, Project project)
     {
         var permissionIds = GetEffectivePermissionIds(currentUser);
@@ -326,7 +317,7 @@ public class ProjectService : IProjectService
         return rolePermissionIds.Concat(directPermissionIds).Concat(groupPermissionIds).ToHashSet();
     }
 
-    // Shared by CreateAsync/UpdateAsync — the same field-level validation both need.
+
     private static void ValidateProjectPayload(
         string projectNameEn,
         string projectNameAr,
