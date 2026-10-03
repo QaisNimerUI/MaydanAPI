@@ -4,6 +4,7 @@ using Maydan.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Maydan.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MaydanDbContext))]
-    partial class MaydanDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930191510_GrantAssociationManageUsersPermission")]
+    partial class GrantAssociationManageUsersPermission
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2347,9 +2350,6 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Property<int>("AssociationId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("CityId")
-                        .HasColumnType("int");
-
                     b.Property<string>("CivilId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -2359,9 +2359,6 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
-
-                    b.Property<int?>("CountryId")
-                        .HasColumnType("int");
 
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -2380,9 +2377,6 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int?>("Gender")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -2396,14 +2390,7 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int?>("MaritalStatus")
-                        .HasColumnType("int");
-
                     b.Property<string>("MiddleName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Nationality")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -2419,66 +2406,17 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("YearsOfExperience")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AssociationId");
 
-                    b.HasIndex("CityId");
-
                     b.HasIndex("CivilIdHash")
                         .IsUnique();
-
-                    b.HasIndex("CountryId");
 
                     b.HasIndex("QrCode")
                         .IsUnique();
 
                     b.ToTable("Workers", (string)null);
-                });
-
-            modelBuilder.Entity("Maydan.Domain.Entities.WorkerServiceLink", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("WorkerId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ServiceId");
-
-                    b.HasIndex("WorkerId", "ServiceId")
-                        .IsUnique();
-
-                    b.ToTable("WorkerServiceLinks", (string)null);
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Association", b =>
@@ -2696,40 +2634,7 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Maydan.Domain.Entities.City", "City")
-                        .WithMany()
-                        .HasForeignKey("CityId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Maydan.Domain.Entities.Country", "Country")
-                        .WithMany()
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Association");
-
-                    b.Navigation("City");
-
-                    b.Navigation("Country");
-                });
-
-            modelBuilder.Entity("Maydan.Domain.Entities.WorkerServiceLink", b =>
-                {
-                    b.HasOne("Maydan.Domain.Entities.Service", "Service")
-                        .WithMany()
-                        .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Maydan.Domain.Entities.Worker", "Worker")
-                        .WithMany("WorkerServices")
-                        .HasForeignKey("WorkerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Service");
-
-                    b.Navigation("Worker");
                 });
 
             modelBuilder.Entity("Maydan.Domain.Entities.Association", b =>
@@ -2785,11 +2690,6 @@ namespace Maydan.Infrastructure.Persistence.Migrations
                     b.Navigation("UserGroups");
 
                     b.Navigation("UserPermissions");
-                });
-
-            modelBuilder.Entity("Maydan.Domain.Entities.Worker", b =>
-                {
-                    b.Navigation("WorkerServices");
                 });
 #pragma warning restore 612, 618
         }
