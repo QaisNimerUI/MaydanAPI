@@ -77,12 +77,6 @@ builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(u
 builder.Services.AddSingleton<ICivilIdHasher, HmacCivilIdHasher>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
-
-var uploadsRootPath = Path.Combine(
-    builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot"),
-    "uploads");
-builder.Services.AddSingleton<IFileStorageService>(new LocalFileStorageService(uploadsRootPath));
-
 builder.Services.AddValidatorsFromAssembly(typeof(Maydan.Application.AssemblyReference).Assembly);
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();

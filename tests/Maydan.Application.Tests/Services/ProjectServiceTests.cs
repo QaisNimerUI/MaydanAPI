@@ -786,6 +786,13 @@ public class ProjectServiceTests
         public IAssociationRepository Associations => throw new NotSupportedException();
         public IProductionCompanyRepository ProductionCompanies => throw new NotSupportedException();
         public IWorkerRepository Workers => throw new NotSupportedException();
+        public ICityLocationRepository CityLocations => throw new NotSupportedException();
+        public IAssociationProjectSupervisorRepository AssociationProjectSupervisors => throw new NotSupportedException();
+        public IPasswordResetTokenRepository PasswordResetTokens => throw new NotSupportedException();
+        public IRefreshTokenRepository RefreshTokens => throw new NotSupportedException();
+        public ISystemConfigurationRepository SystemConfigurations => throw new NotSupportedException();
+        public IServiceRepository Services => throw new NotSupportedException();
+
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
     }

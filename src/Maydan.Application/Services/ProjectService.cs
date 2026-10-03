@@ -5,18 +5,8 @@ using Maydan.Domain.Enums;
 
 namespace Maydan.Application.Services;
 
-// Projects audit follow-up: every validation failure in this class used to throw a bare
-// Exception, which ApiControllerBase.HandleException's switch has no case for — it always fell
-// through to the generic 500 branch regardless of whether the real problem was a 400 (bad
-// input/business rule) or a 404 (referenced entity not found). Every throw below now uses the
-// same exception-type convention UserManagementService already established:
-// InvalidOperationException for business-rule violations, KeyNotFoundException for "not found",
-// UnauthorizedAccessException for acting outside the caller's own entity boundary (mirrors
-// UserManagementService.GetScopedUserAsync()'s "Cannot manage users outside the current entity").
-//
-// NOTE (deliberately out of scope): linking a Project to Locations/Associations is blocked on the
-// GIS team providing real location data — no field, table, or DTO for that exists here, and none
-// should be added until that data is available.
+
+
 public class ProjectService : IProjectService
 {
     private const int ViewProjectsPermissionId = 25;
@@ -242,6 +232,7 @@ public class ProjectService : IProjectService
             .ToList();
     }
 
+
     private async Task<User> GetCurrentUserAsync(int currentUserId, CancellationToken cancellationToken)
     {
         var user = await _unitOfWork.Users.GetByIdAsync(currentUserId, cancellationToken)
@@ -255,7 +246,6 @@ public class ProjectService : IProjectService
         return user;
     }
 
-    // Shared by CreateAsync/UpdateAsync — the same field-level validation both need.
     private async Task<User> GetCurrentUserWithPermissionsAsync(int currentUserId, CancellationToken cancellationToken)
     {
         var user = await _unitOfWork.Users.GetWithPermissionsAsync(currentUserId, cancellationToken)
@@ -276,6 +266,7 @@ public class ProjectService : IProjectService
             throw new UnauthorizedAccessException("Caller does not hold the required Projects permission.");
         }
     }
+
 
     private static bool CanViewProject(User currentUser, Project project)
     {
@@ -326,7 +317,7 @@ public class ProjectService : IProjectService
         return rolePermissionIds.Concat(directPermissionIds).Concat(groupPermissionIds).ToHashSet();
     }
 
-    // Shared by CreateAsync/UpdateAsync - the same field-level validation both need.
+
     private static void ValidateProjectPayload(
         string projectNameEn,
         string projectNameAr,
